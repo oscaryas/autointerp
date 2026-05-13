@@ -1,0 +1,20 @@
+{"text": "This movie was absolutely fantastic! I loved every minute of it.", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Terrible film. Waste of time and money.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "One of the best movies I've ever seen. Highly recommended!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Boring and predictable. I fell asleep halfway through.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Amazing performances by all the actors. A masterpiece!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Complete disaster. Poor acting and terrible script.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "I was moved to tears. Such a beautiful and touching story.", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Awful movie. Don't waste your time on this garbage.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Brilliant direction and cinematography. A true work of art.", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Disappointing and overrated. Expected much better.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Exceeded all my expectations. Absolutely worth watching!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Painfully slow and confusing. I regret watching it.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Heartwarming and uplifting. Made my day!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Poorly executed with a weak plot. Very disappointed.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Captivating from start to finish. Could watch it again!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Dull and uninspiring. Lacks any real substance.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Phenomenal! One of my all-time favorites.", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Horrible experience. Would not recommend to anyone.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Engaging and well-crafted. A must-see!", "label": 1, "metadata": {"source": "imdb", "split": "train"}}
+{"text": "Mediocre at best. Nothing special about it.", "label": 0, "metadata": {"source": "imdb", "split": "train"}}

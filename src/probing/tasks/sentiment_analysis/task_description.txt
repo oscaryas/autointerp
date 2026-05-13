@@ -1,0 +1,29 @@
+Sentiment Analysis Probing
+
+Task: Probe whether language models internally represent sentiment (positive vs negative) in their hidden states.
+
+Objective: Train linear probes on model activations to classify the sentiment of text. Your goal is to conduct a systematic analysis to understand:
+1. Which layers encode sentiment information most strongly?
+2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
+3. How accurate can a simple linear probe be?
+4. Are the learned probe weights interpretable?
+
+Labels:
+- 0: Negative sentiment
+- 1: Positive sentiment
+
+Dataset: 1000 labeled movie reviews (500 positive, 500 negative) from IMDB
+
+Expected Analysis:
+- Probe all layers of the model (layer 0 to final layer)
+- Test different token aggregation strategies
+- Use cross-validation for robust estimates
+- Report accuracy, precision, recall, F1, ROC-AUC
+- Visualize probe performance across layers
+- Analyze feature importance
+
+Deliverables:
+1. Trained probe saved to `final_probe/` directory
+2. Metrics in JSON format
+3. Visualizations of results (PNG/PDF)
+4. Written analysis of findings

@@ -1,0 +1,47 @@
+# Core ML Libraries
+torch>=2.0.0
+transformers>=4.35.0
+tokenizers>=0.15.0
+accelerate>=0.25.0
+
+# Probing & Interpretability
+scikit-learn>=1.3.0
+scipy>=1.11.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Activation Extraction
+baukit>=0.1.8
+nnsight>=0.2.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# Utilities
+datasets>=2.14.0
+tqdm>=4.66.0
+jupyter>=1.0.0
+ipython>=8.12.0
+
+# Evaluation
+evaluate>=0.4.0
+rouge-score>=0.1.2
+
+# Model utilities
+safetensors>=0.4.0
+sentencepiece>=0.1.99
+protobuf>=4.25.0
+
+# API clients
+openai>=1.0.0
+anthropic>=0.7.0
+
+# Logging & Monitoring
+wandb>=0.16.0
+tensorboard>=2.15.0
+
+# Data processing
+jsonlines>=4.0.0
+pyyaml>=6.0
