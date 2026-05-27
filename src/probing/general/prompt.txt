@@ -24,7 +24,7 @@ tokenizer = AutoTokenizer.from_pretrained("{model}")
 ```
 
 ### 2. Extract Activations
-Extract hidden states from ALL layers for each labeled example. Use PyTorch hooks or the `output_hidden_states=True` parameter.
+Extract hidden states from ALL layers for each labeled example. 
 
 ### 3. Train Linear Probes
 For EACH layer and EACH aggregation method:
@@ -61,11 +61,7 @@ with open('final_probe/probe.pkl', 'wb') as f:
 
 ## Information on the Setup
 - You have access to Python packages: transformers, torch, scikit-learn, numpy, pandas, matplotlib
-- Utility scripts are available in the current directory:
-  - `extract_activations.py`: Helper functions for extracting activations
-  - `train_probe.py`: Helper functions for training probes
 - GPU is available for faster inference
-- Consider using batching for efficiency
 
 ## Rules
 1. **No user interaction**: You must operate autonomously
@@ -82,50 +78,3 @@ with open('final_probe/probe.pkl', 'wb') as f:
 3. **Visualizations**: Any plots showing probe performance (PNG/PDF format)
 4. **metrics.json**: (Optional) Your own evaluation metrics
 
-## Tips for Success
-- Start with a small subset of data to test your pipeline
-- Normalize features before training probes (improves convergence)
-- Use cross-validation to avoid overfitting
-- Compare results across layers - often middle layers are most informative
-- Check for class imbalance in the data
-- Save intermediate results in case of errors
-- Time management: focus on systematic coverage rather than perfect optimization
-
-## Example Workflow
-```python
-# 1. Load data and model
-import json
-texts, labels = [], []
-with open('labeled_data.jsonl') as f:
-    for line in f:
-        item = json.loads(line)
-        texts.append(item['text'])
-        labels.append(item['label'])
-
-from transformers import AutoModel, AutoTokenizer
-model = AutoModel.from_pretrained("{model}")
-tokenizer = AutoTokenizer.from_pretrained("{model}")
-
-# 2. Extract activations for all layers
-# ... (extract hidden states from all layers)
-
-# 3. Train probes for each layer
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
-
-results = {{}}
-for layer_idx in range(n_layers):
-    X = activations[layer_idx]  # Shape: (n_samples, hidden_dim)
-    probe = LogisticRegression(max_iter=1000)
-    scores = cross_val_score(probe, X, labels, cv=5)
-    results[layer_idx] = scores.mean()
-    print(f"Layer {{layer_idx}}: {{scores.mean():.3f}}")
-
-# 4. Select and save best probe
-best_layer = max(results, key=results.get)
-# ... train on best layer and save
-```
-
-Remember: **Be thorough and systematic!** The goal is not just to train one probe, but to conduct a comprehensive analysis of which layers and representations encode the target concept.
-
-Good luck!
