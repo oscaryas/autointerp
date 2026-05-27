@@ -93,7 +93,10 @@ def evaluate_probe(probe_data, X, y):
     layer_idx = probe_data.get('layer', -1) if isinstance(probe_data, dict) else -1
     aggregation = probe_data.get('aggregation', 'mean') if isinstance(probe_data, dict) else 'mean'
 
-    # Make predictions
+    scaler = probe_data.get('scaler') if isinstance(probe_data, dict) else None
+    if scaler is not None:
+        X = scaler.transform(X)
+
     y_pred = probe.predict(X)
     y_proba = probe.predict_proba(X)[:, 1] if hasattr(probe, 'predict_proba') else None
 

@@ -1,25 +1,17 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "Building AutoInterp container..."
+container="${1:-autointerp}"
 
-# Get script directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+: "${AUTOINTERP_CONTAINER_TAG:=autointerp:${container}}"
+: "${AUTOINTERP_CONTAINERS_DIR:=${SCRATCH:-$PWD}/containers}"
 
-# Build Docker image
-docker build -t autointerp:latest .
+mkdir -p "${AUTOINTERP_CONTAINERS_DIR}"
 
-echo "Container built successfully!"
-echo ""
-echo "To test the container locally:"
-echo "  docker run --gpus all -it --rm autointerp:latest"
-echo ""
-echo "To push to Docker Hub (for Runpod):"
-echo "  docker tag autointerp:latest <your-dockerhub-username>/autointerp:latest"
-echo "  docker push <your-dockerhub-username>/autointerp:latest"
-echo ""
-echo "To use with Runpod:"
-echo "  1. Push image to Docker Hub or container registry"
-echo "  2. Update AUTOINTERP_CONTAINER_IMAGE in set_env_vars.sh"
-echo "  3. Run: bash ../src/commit_utils/commit.sh"
+podman build -t "${AUTOINTERP_CONTAINER_TAG}" -f containers/Containerfile containers/
+
+enroot import \
+    -o "${AUTOINTERP_CONTAINERS_DIR}/${container}.sqsh" \
+    "podman://${AUTOINTERP_CONTAINER_TAG}"
+
+echo "Built ${AUTOINTERP_CONTAINERS_DIR}/${container}.sqsh"

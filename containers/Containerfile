@@ -1,0 +1,30 @@
+FROM nvcr.io/nvidia/pytorch:24.10-py3
+# GH200 (aarch64) compatible. Alternative plain CUDA base:
+# FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+RUN apt-get update && apt-get install -y \
+    git curl wget build-essential \
+    tree vim htop tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY requirements.txt /tmp/requirements.txt
+RUN uv pip install --system --no-cache-dir -r /tmp/requirements.txt
+
+RUN npm install -g \
+    @anthropic-ai/claude-code@2.0.55 \
+    @openai/codex@0.79.0 \
+    opencode-ai@1.1.59
+
+ENV PATH="/root/.local/bin:$PATH"
+ENV NO_PROXY="localhost,127.0.0.1"
+ENV no_proxy="localhost,127.0.0.1"
