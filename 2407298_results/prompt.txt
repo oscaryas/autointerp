@@ -1,0 +1,162 @@
+You are tasked with conducting systematic probing experiments on the language model `Qwen/Qwen2.5-1.5B`.
+
+## Objective
+Your goal is to understand what features the model has learned by training linear probes on its internal representations. Specifically, you will probe for: sentiment (positive vs negative).
+
+## Task Description
+Sentiment Analysis Probing
+
+Task: Probe whether language models internally represent sentiment (positive vs negative) in their hidden states.
+
+Objective: Train linear probes on model activations to classify the sentiment of text. Your goal is to conduct a systematic analysis to understand:
+1. Which layers encode sentiment information most strongly?
+2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
+3. How accurate can a simple linear probe be?
+4. Are the learned probe weights interpretable?
+
+Labels:
+- 0: Negative sentiment
+- 1: Positive sentiment
+
+Dataset: 1000 labeled movie reviews (500 positive, 500 negative) from IMDB
+
+Expected Analysis:
+- Probe all layers of the model (layer 0 to final layer)
+- Test different token aggregation strategies
+- Use cross-validation for robust estimates
+- Report accuracy, precision, recall, F1, ROC-AUC
+- Visualize probe performance across layers
+- Analyze feature importance
+
+Deliverables:
+1. Trained probe saved to `final_probe/` directory
+2. Metrics in JSON format
+3. Visualizations of results (PNG/PDF)
+4. Written analysis of findings
+
+## Labeled Data
+You have access to `labeled_data.jsonl` containing 20 labeled examples in the following format:
+```
+{{"text": "example text", "label": 0, "metadata": {{...}}}}
+```
+
+## Your Task
+Conduct a systematic analysis following these steps:
+
+### 1. Load the Model
+Load the model `Qwen/Qwen2.5-1.5B` using the transformers library:
+```python
+from transformers import AutoModel, AutoTokenizer
+model = AutoModel.from_pretrained("Qwen/Qwen2.5-1.5B")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
+```
+
+### 2. Extract Activations
+Extract hidden states from ALL layers for each labeled example. Use PyTorch hooks or the `output_hidden_states=True` parameter.
+
+### 3. Train Linear Probes
+For EACH layer and EACH aggregation method:
+- **Aggregation methods to try**: first token, last token, mean pooling, max pooling
+- Use scikit-learn's `LogisticRegression` for probe training
+- Apply 5-fold cross-validation for robust estimates
+- Track accuracy, precision, recall, F1, and ROC-AUC
+
+### 4. Systematic Comparison
+- Compare probe performance across ALL layers
+- Compare different token aggregation strategies
+- Identify which layers encode the target concept most strongly
+- Visualize results (plot accuracy vs layer number)
+
+### 5. Feature Analysis
+- Examine the learned probe weights
+- Identify which activation dimensions are most important
+- Assess whether the learned features are interpretable
+
+### 6. Save Results
+Save your best probe to the `final_probe/` directory:
+```python
+import pickle
+probe_data = {{
+    'model': best_probe,
+    'scaler': scaler,  # if you normalized features
+    'layer': best_layer_idx,
+    'aggregation': best_aggregation_method,
+    'cv_accuracy_mean': accuracy,
+}}
+with open('final_probe/probe.pkl', 'wb') as f:
+    pickle.dump(probe_data, f)
+```
+
+## Information on the Setup
+- You have access to Python packages: transformers, torch, scikit-learn, numpy, pandas, matplotlib
+- Utility scripts are available in the current directory:
+  - `extract_activations.py`: Helper functions for extracting activations
+  - `train_probe.py`: Helper functions for training probes
+- GPU is available for faster inference
+- Consider using batching for efficiency
+
+## Rules
+1. **No user interaction**: You must operate autonomously
+2. **Time limit**: You have 1 hours (check with `bash timer.sh`)
+3. **Work in current directory**: Do not modify files outside the current directory
+4. **Do not modify labeled_data.jsonl**: Use the data as-is
+5. **Use scikit-learn LogisticRegression**: This ensures compatibility with evaluation
+6. **Be systematic**: Probe ALL layers, not just a few
+7. **Document your process**: Create a summary of your findings
+
+## Expected Deliverables
+1. **final_probe/probe.pkl**: Your best trained probe
+2. **analysis.md** or **analysis.txt**: Summary of your findings
+3. **Visualizations**: Any plots showing probe performance (PNG/PDF format)
+4. **metrics.json**: (Optional) Your own evaluation metrics
+
+## Tips for Success
+- Start with a small subset of data to test your pipeline
+- Normalize features before training probes (improves convergence)
+- Use cross-validation to avoid overfitting
+- Compare results across layers - often middle layers are most informative
+- Check for class imbalance in the data
+- Save intermediate results in case of errors
+- Time management: focus on systematic coverage rather than perfect optimization
+
+## Example Workflow
+```python
+# 1. Load data and model
+import json
+texts, labels = [], []
+with open('labeled_data.jsonl') as f:
+    for line in f:
+        item = json.loads(line)
+        texts.append(item['text'])
+        labels.append(item['label'])
+
+from transformers import AutoModel, AutoTokenizer
+model = AutoModel.from_pretrained("Qwen/Qwen2.5-1.5B")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-1.5B")
+
+# 2. Extract activations for all layers
+# ... (extract hidden states from all layers)
+
+# 3. Train probes for each layer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+results = {{}}
+for layer_idx in range(n_layers):
+    X = activations[layer_idx]  # Shape: (n_samples, hidden_dim)
+    probe = LogisticRegression(max_iter=1000)
+    scores = cross_val_score(probe, X, labels, cv=5)
+    results[layer_idx] = scores.mean()
+    print(f"Layer {{layer_idx}}: {{scores.mean():.3f}}")
+
+# 4. Select and save best probe
+best_layer = max(results, key=results.get)
+# ... train on best layer and save
+```
+
+Remember: **Be thorough and systematic!** The goal is not just to train one probe, but to conduct a comprehensive analysis of which layers and representations encode the target concept.
+
+Good luck!
+
+
+IMPORTANT: You are running in non-interactive mode. Ensure all processes finish before your final message.
