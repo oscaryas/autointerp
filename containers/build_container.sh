@@ -23,8 +23,12 @@ graphroot = "${AUTOINTERP_PODMAN_SHM_DIR}/root"
 mount_program = "/usr/bin/fuse-overlayfs-1.13"
 EOF
     echo "Created ${AUTOINTERP_PODMAN_STORAGE_CONF}"
-else
-    echo "Using existing Podman storage config: ${AUTOINTERP_PODMAN_STORAGE_CONF}"
+fi
+
+if ! grep -q '/dev/shm' "${AUTOINTERP_PODMAN_STORAGE_CONF}"; then
+    echo "ERROR: Podman storage config does not use /dev/shm: ${AUTOINTERP_PODMAN_STORAGE_CONF}" >&2
+    echo "Remove the stale config or update it before building." >&2
+    exit 1
 fi
 
 export CONTAINERS_STORAGE_CONF="${AUTOINTERP_PODMAN_STORAGE_CONF}"
