@@ -39,12 +39,7 @@ For EACH layer and EACH aggregation method:
 - Identify which layers encode the target concept most strongly
 - Visualize results (plot accuracy vs layer number)
 
-### 5. Feature Analysis
-- Examine the learned probe weights
-- Identify which activation dimensions are most important
-- Assess whether the learned features are interpretable
-
-### 6. Save Results
+### 5. Save Results
 Save your best probe to the `final_probe/` directory:
 ```python
 import pickle
