@@ -43,7 +43,7 @@ cp "${AUTOINTERP_ROOT}/agents/${AGENT}/solve.sh" "${JOB_DIR}/agent_solve.sh"
 chmod +x "${JOB_DIR}/agent_solve.sh"
 
 # Generate prompt
-PROMPT=$(python "${AUTOINTERP_ROOT}/src/probing/general/get_prompt.py" \
+PROMPT=$(python3 "${AUTOINTERP_ROOT}/src/probing/general/get_prompt.py" \
     --task "$TASK" \
     --model "$MODEL" \
     --time-limit "$NUM_HOURS" \
@@ -126,7 +126,7 @@ echo "--- END SOLVE DIAGNOSTICS ---"
 # Parse agent trace
 TRACE_PARSER="${AUTOINTERP_ROOT}/agents/${AGENT}/human_readable_trace.py"
 if [ -f "$TRACE_PARSER" ]; then
-    python "$TRACE_PARSER" "${EVAL_DIR}/solve_out.txt" -o "${EVAL_DIR}/solve_parsed.txt" || true
+    python3 "$TRACE_PARSER" "${EVAL_DIR}/solve_out.txt" -o "${EVAL_DIR}/solve_parsed.txt" || true
 fi
 
 # Ensure final_probe exists even if agent didn't produce one
