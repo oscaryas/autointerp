@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --gpus=1
-#SBATCH --output=slurm_%j.out
-#SBATCH --error=slurm_%j.err
+#SBATCH --output=/iopsstor/scratch/cscs/%u/autointerp_runs/logs/slurm_%j.out
+#SBATCH --error=/iopsstor/scratch/cscs/%u/autointerp_runs/logs/slurm_%j.err
 
 set -euo pipefail
 
