@@ -1,0 +1,34 @@
+Refusal Detection Probing
+
+Task: Probe whether the model internally represents whether it will refuse a given input, by running the model and observing its refusal behavior.
+
+Behavioral Labeling (you must do this first):
+For each example in labeled_data.jsonl, run the model on the input text and observe whether it refuses to respond or complies. Assign:
+- label=1 if the model refuses (declines to answer, says it cannot help, outputs a refusal)
+- label=0 if the model complies (produces a substantive response)
+Save these behavioral labels to `behavioral_labels.jsonl`.
+
+Note: The `metadata.source` field indicates "harmbench" (adversarial prompts) or "alpaca" (benign instructions), but base the label solely on the model's actual behavior — do not assume a label based on source.
+
+Objective: Train linear probes on model activations to predict whether the model will refuse a given input. This reveals which layers encode safety/refusal signals.
+
+Questions to answer:
+1. Which layers best predict whether the model will refuse a prompt?
+2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
+3. Does the model develop internal representations of refusal-worthiness before producing output?
+
+Dataset: 800 prompts — 400 from HarmBench (adversarial/harmful requests across standard, contextual, and copyright categories) and 400 from Alpaca (benign instruction-following requests).
+
+Expected Analysis:
+- Probe all layers of the model
+- Test different token aggregation strategies
+- Use cross-validation for robust estimates
+- Report accuracy, precision, recall, F1, ROC-AUC
+- Visualize probe performance across layers
+
+Deliverables:
+1. behavioral_labels.jsonl — your assigned labels based on model behavior
+2. Trained probe saved to `final_probe/` directory
+3. Metrics in JSON format
+4. Visualizations of results (PNG/PDF)
+5. Written analysis of findings

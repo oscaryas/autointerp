@@ -1,29 +1,32 @@
 Sentiment Analysis Probing
 
-Task: Probe whether language models internally represent sentiment (positive vs negative) in their hidden states.
+Task: Probe whether the model internally represents sentiment by measuring whether it can correctly classify sentiment from text.
 
-Objective: Train linear probes on model activations to classify the sentiment of text. Your goal is to conduct a systematic analysis to understand:
-1. Which layers encode sentiment information most strongly?
+Behavioral Labeling (you must do this first):
+For each example in labeled_data.jsonl, run the model to classify the sentiment of the text (positive or negative). Compare the model's prediction to the `ground_truth_sentiment` field (0=negative, 1=positive). Assign:
+- label=1 if the model correctly identifies the sentiment
+- label=0 if the model misclassifies the sentiment
+Save these behavioral labels to `behavioral_labels.jsonl`.
+
+Objective: Train linear probes on model activations to predict whether the model will correctly classify the sentiment of a given text. This reveals which layers encode sentiment information most strongly.
+
+Questions to answer:
+1. Which layers best predict whether the model will classify sentiment correctly?
 2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
-3. How accurate can a simple linear probe be?
-4. Are the learned probe weights interpretable?
+3. How accurately can a simple linear probe predict the model's sentiment classification behavior?
 
-Labels:
-- 0: Negative sentiment
-- 1: Positive sentiment
-
-Dataset: 1000 labeled movie reviews (500 positive, 500 negative) from IMDB
+Dataset: 1000 IMDB movie reviews (500 positive, 500 negative). The `ground_truth_sentiment` field gives the true label for comparison.
 
 Expected Analysis:
-- Probe all layers of the model (layer 0 to final layer)
+- Probe all layers of the model
 - Test different token aggregation strategies
 - Use cross-validation for robust estimates
 - Report accuracy, precision, recall, F1, ROC-AUC
 - Visualize probe performance across layers
-- Analyze feature importance
 
 Deliverables:
-1. Trained probe saved to `final_probe/` directory
-2. Metrics in JSON format
-3. Visualizations of results (PNG/PDF)
-4. Written analysis of findings
+1. behavioral_labels.jsonl — your assigned labels based on model behavior
+2. Trained probe saved to `final_probe/` directory
+3. Metrics in JSON format
+4. Visualizations of results (PNG/PDF)
+5. Written analysis of findings

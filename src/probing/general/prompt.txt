@@ -6,70 +6,36 @@ Your goal is to understand what features the model has learned by training linea
 ## Task Description
 {task_description}
 
-## Labeled Data
-You have access to `labeled_data.jsonl` containing {n_examples} labeled examples in the following format:
+## Data
+You have access to `labeled_data.jsonl` containing {n_examples} examples. Depending on the task, this file either contains pre-assigned labels (`"label"` field) or requires you to determine behavioral labels yourself by running the model. See the Task Description above for which applies.
+
+If you determine behavioral labels, save them to `behavioral_labels.jsonl` in this format:
 ```
-{{"text": "example text", "label": 0, "metadata": {{...}}}}
+{{"text": "example text", "label": 0}}
 ```
+Use `label=1` for the positive class and `label=0` for the negative class as defined in the Task Description.
 
-## Your Task
-Conduct a systematic analysis following these steps:
-
-### 1. Load the Model
-Load the model `{model}` using the transformers library:
-```python
-from transformers import AutoModel, AutoTokenizer
-model = AutoModel.from_pretrained("{model}")
-tokenizer = AutoTokenizer.from_pretrained("{model}")
-```
-
-### 2. Extract Activations
-Extract hidden states from ALL layers for each labeled example. 
-
-### 3. Train Linear Probes
-For EACH layer and EACH aggregation method:
-- **Aggregation methods to try**: first token, last token, mean pooling, max pooling
-- Use scikit-learn's `LogisticRegression` for probe training
-- Apply 5-fold cross-validation for robust estimates
-- Track accuracy, precision, recall, F1, and ROC-AUC
-
-### 4. Systematic Comparison
-- Compare probe performance across ALL layers
-- Compare different token aggregation strategies
-- Identify which layers encode the target concept most strongly
-- Visualize results (plot accuracy vs layer number)
-
-### 5. Save Results
-Save your best probe to the `final_probe/` directory:
-```python
-import pickle
-probe_data = {{
-    'model': best_probe,
-    'scaler': scaler,  # if you normalized features
-    'layer': best_layer_idx,
-    'aggregation': best_aggregation_method,
-    'cv_accuracy_mean': accuracy,
-}}
-with open('final_probe/probe.pkl', 'wb') as f:
-    pickle.dump(probe_data, f)
-```
+## Autonomy & Exploration
+- You have complete freedom in your approach: data sources, training methods, etc.
+- You can do multiple iterations on the approach to probing.
+- Internet access is unrestricted.
 
 ## Information on the Setup
 - You have access to Python packages: transformers, torch, scikit-learn, numpy, pandas, matplotlib
 - GPU is available for faster inference
 
 ## Rules
-1. **No user interaction**: You must operate autonomously
-2. **Time limit**: You have {time_limit} hours (check with `bash timer.sh`)
-3. **Work in current directory**: Do not modify files outside the current directory
-4. **Do not modify labeled_data.jsonl**: Use the data as-is
-5. **Use scikit-learn LogisticRegression**: This ensures compatibility with evaluation
-6. **Be systematic**: Probe ALL layers, not just a few
-7. **Document your process**: Create a summary of your findings
+1. There will be no user interaction. You have to operate autonomously.
+2. You have a maximum of {time_limit} hours. You can query how much time you have left by calling `bash timer.sh` in the current directory.
+3. Do not modify `evaluate.py` or `labeled_data.jsonl`.
+4. Your probe must run in the current environment (same packages). Installing additional packages for experimentation is allowed, but ensure probing works with the starting environment.
+5. **Document your process**: Create a summary of your findings.
 
 ## Expected Deliverables
 1. **final_probe/probe.pkl**: Your best trained probe
-2. **analysis.md** or **analysis.txt**: Summary of your findings
-3. **Visualizations**: Any plots showing probe performance (PNG/PDF format)
-4. **metrics.json**: (Optional) Your own evaluation metrics
+2. **behavioral_labels.jsonl**: The labels you used to train the probe (required if you determined labels behaviorally; omit if using pre-assigned labels from labeled_data.jsonl)
+3. **analysis.md** or **analysis.txt**: Summary of your findings
+4. **Visualizations**: Any plots showing probe performance (PNG/PDF format)
+5. **metrics.json**: Your own evaluation metrics
 
+Remember: NEVER ask the user for feedback. Just execute actions which make most sense to you. We will evaluate your results on {concept} once you are done.

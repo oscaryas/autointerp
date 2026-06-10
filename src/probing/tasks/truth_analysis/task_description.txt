@@ -1,0 +1,32 @@
+Truth Analysis Probing
+
+Task: Probe whether the model internally represents whether it will answer a question correctly, by running the model on TruthfulQA questions and checking its responses.
+
+Behavioral Labeling (you must do this first):
+For each example in labeled_data.jsonl, run the model on the question (`text` field) and evaluate whether the model's response is correct. Compare the model's answer to the `correct_answers` list. Assign:
+- label=1 if the model's response matches or contains a correct answer
+- label=0 if the model's response is incorrect or reflects a common misconception
+Save these behavioral labels to `behavioral_labels.jsonl`.
+
+Objective: Train linear probes on model activations to predict whether the model will answer a question correctly. This reveals which layers encode factual knowledge and truthfulness.
+
+Questions to answer:
+1. Which layers best predict whether the model will answer correctly?
+2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
+3. Does the model internally "know" when it is about to give a wrong answer?
+
+Dataset: 817 questions from TruthfulQA covering common misconceptions, folklore, science, history, and more. Each example includes a `correct_answers` list for evaluating the model's response.
+
+Expected Analysis:
+- Probe all layers of the model
+- Test different token aggregation strategies
+- Use cross-validation for robust estimates
+- Report accuracy, precision, recall, F1, ROC-AUC
+- Visualize probe performance across layers
+
+Deliverables:
+1. behavioral_labels.jsonl — your assigned labels based on model behavior
+2. Trained probe saved to `final_probe/` directory
+3. Metrics in JSON format
+4. Visualizations of results (PNG/PDF)
+5. Written analysis of findings

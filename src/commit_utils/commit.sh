@@ -11,6 +11,9 @@ models=(
 
 tasks=(
     "sentiment_analysis"
+    "deception"
+    "refusal"
+    "truth_analysis"
 )
 
 agents=(

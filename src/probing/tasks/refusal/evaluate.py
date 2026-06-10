@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluation script for sentiment analysis probing task.
+Evaluation script for refusal probing task.
 Validates the agent's probe and computes metrics.
 """
 import argparse
@@ -130,7 +130,7 @@ def main():
     parser.add_argument("--json-output-file", default=None, help="JSON output file")
     args = parser.parse_args()
 
-    print("=== Evaluating Sentiment Analysis Probe ===")
+    print("=== Evaluating refusal Probe ===")
 
     # Load data
     print("Loading labeled data...")

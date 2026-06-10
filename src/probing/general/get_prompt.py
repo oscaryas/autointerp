@@ -28,6 +28,9 @@ def get_concept_from_task(task_name):
     """Infer concept name from task name."""
     concept_map = {
         'sentiment_analysis': 'sentiment (positive vs negative)',
+        'deception': 'deception (honest vs deceptive model behavior under role-play prompting)',
+        'refusal': 'refusal-worthiness (benign vs harmful/toxic inputs)',
+        'truth_analysis': 'factual truth (supported vs refuted claims)',
         'factuality': 'factual correctness',
         'toxicity': 'toxic vs non-toxic language',
         'subjectivity': 'subjective vs objective statements',
