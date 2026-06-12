@@ -1,0 +1,28 @@
+deception codex google/gemma-2-2b 2513691 1 gpt-4o 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     deception
+Agent:    codex (gpt-4o)
+Model:    google/gemma-2-2b
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_google_gemma-2-2b_2513691
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/deception_google_gemma-2-2b_2513691
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid007013
+disk_job_dir: 20K
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/deception_google_gemma-2-2b_2513691/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating Deception Probe ===
+Loading labeled data...
+Loading labels from: labeled_data.jsonl
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/deception_google_gemma-2-2b_2513691

@@ -1,0 +1,47 @@
+refusal claude HuggingFaceTB/SmolLM2-1.7B 2513487 1 claude-opus-4-6 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     refusal
+Agent:    claude (claude-opus-4-6)
+Model:    HuggingFaceTB/SmolLM2-1.7B
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/refusal_HuggingFaceTB_SmolLM2-1.7B_2513487
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513487
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid007531
+disk_job_dir: 3.9M
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513487/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating refusal Probe ===
+Loading labeled data...
+Loading labels from: behavioral_labels.jsonl
+Loaded 800 examples
+Loading model: HuggingFaceTB/SmolLM2-1.7B
+Loading probe from: final_probe
+Probe metadata: layer=14, aggregation=mean
+Extracting activations...
+Activations shape: (800, 2048)
+Evaluating probe...
+
+=== Results ===
+Accuracy:  1.000
+Precision: 1.000
+Recall:    1.000
+F1 Score:  1.000
+ROC-AUC:   1.000
+Layer:     14
+Aggregation: mean
+
+Metrics saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513487/metrics.json
+=== Evaluation Complete ===
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513487

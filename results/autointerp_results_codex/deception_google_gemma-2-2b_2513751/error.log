@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_google_gemma-2-2b_2513751/evaluate.py", line 262, in <module>
+    main()
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_google_gemma-2-2b_2513751/evaluate.py", line 173, in main
+    texts, labels = load_labeled_data(args.data_file, args.behavioral_labels_file)
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_google_gemma-2-2b_2513751/evaluate.py", line 30, in load_labeled_data
+    labels.append(item['label'])
+KeyError: 'label'
+srun: error: nid007540: task 0: Exited with exit code 1
+srun: Terminating StepId=2513751.1

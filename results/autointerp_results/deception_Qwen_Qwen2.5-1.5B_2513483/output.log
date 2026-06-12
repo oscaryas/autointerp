@@ -1,0 +1,47 @@
+deception claude Qwen/Qwen2.5-1.5B 2513483 1 claude-opus-4-6 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     deception
+Agent:    claude (claude-opus-4-6)
+Model:    Qwen/Qwen2.5-1.5B
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_Qwen_Qwen2.5-1.5B_2513483
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/deception_Qwen_Qwen2.5-1.5B_2513483
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid007510
+disk_job_dir: 5.6M
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/deception_Qwen_Qwen2.5-1.5B_2513483/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating Deception Probe ===
+Loading labeled data...
+Loading labels from: behavioral_labels.jsonl
+Loaded 1000 examples
+Loading model: Qwen/Qwen2.5-1.5B
+Loading probe from: final_probe
+Probe metadata: layer=18, aggregation=mean
+
+[1/3] Evaluating on behavioral labels (geometry-of-truth)...
+  Accuracy: 0.961  F1: 0.957
+
+[2/3] Evaluating on Liar's Bench (instructed-deception)...
+Warning: could not load Liar's Bench: Dataset 'Cadenza-Labs/liars-bench' is a gated dataset on the Hub. You must be authenticated to access it.
+
+[3/3] Evaluating on MASK benchmark...
+Warning: could not load MASK: Dataset 'cais/MASK' is a gated dataset on the Hub. You must be authenticated to access it.
+
+=== Results Summary ===
+  geometry_of_truth: accuracy=0.961  f1=0.957
+
+Metrics saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/deception_Qwen_Qwen2.5-1.5B_2513483/metrics.json
+=== Evaluation Complete ===
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/deception_Qwen_Qwen2.5-1.5B_2513483

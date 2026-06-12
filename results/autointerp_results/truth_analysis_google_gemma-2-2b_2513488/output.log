@@ -1,0 +1,47 @@
+truth_analysis claude google/gemma-2-2b 2513488 1 claude-opus-4-6 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     truth_analysis
+Agent:    claude (claude-opus-4-6)
+Model:    google/gemma-2-2b
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/truth_analysis_google_gemma-2-2b_2513488
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/truth_analysis_google_gemma-2-2b_2513488
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid007532
+disk_job_dir: 4.7M
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/truth_analysis_google_gemma-2-2b_2513488/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating truth_analysis Probe ===
+Loading labeled data...
+Loading labels from: behavioral_labels.jsonl
+Loaded 817 examples
+Loading model: google/gemma-2-2b
+Loading probe from: final_probe
+Probe metadata: layer=12, aggregation=max
+Extracting activations...
+Activations shape: (817, 2304)
+Evaluating probe...
+
+=== Results ===
+Accuracy:  0.993
+Precision: 1.000
+Recall:    0.942
+F1 Score:  0.970
+ROC-AUC:   1.000
+Layer:     12
+Aggregation: max
+
+Metrics saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/truth_analysis_google_gemma-2-2b_2513488/metrics.json
+=== Evaluation Complete ===
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/truth_analysis_google_gemma-2-2b_2513488

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_Qwen_Qwen2.5-1.5B_2513789/evaluate.py", line 262, in <module>
+    main()
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_Qwen_Qwen2.5-1.5B_2513789/evaluate.py", line 173, in main
+    texts, labels = load_labeled_data(args.data_file, args.behavioral_labels_file)
+  File "/iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/deception_Qwen_Qwen2.5-1.5B_2513789/evaluate.py", line 30, in load_labeled_data
+    labels.append(item['label'])
+KeyError: 'label'
+srun: error: nid006085: task 0: Exited with exit code 1
+srun: Terminating StepId=2513789.1

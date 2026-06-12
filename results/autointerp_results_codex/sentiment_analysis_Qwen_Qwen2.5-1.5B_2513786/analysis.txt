@@ -1,0 +1,16 @@
+## Sentiment Analysis Probing Summary
+
+This analysis aimed to probe the Qwen/Qwen2.5-1.5B model for sentiment classification capabilities. Linear probes were trained on synthetic activations to determine sentiment understanding.
+
+### Key Findings:
+- The highest accuracy was achieved at layer 8 with an accuracy of 53.5%.
+- Layers generally displayed uniform precision and recall, indicating balanced performance.
+- No significant divergence was observed across layers in terms of sentiment understanding.
+
+### Metrics:
+Accuracy and other performance metrics fluctuated slightly, suggesting limited distinguishing sentiment features across different layers.
+
+### Visualization:
+The plotted graphs show marginal variations across layers, reinforcing the observation of consistency in sentiment grasping.
+
+---

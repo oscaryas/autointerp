@@ -1,0 +1,28 @@
+refusal codex HuggingFaceTB/SmolLM2-1.7B 2513756 1 gpt-4o 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     refusal
+Agent:    codex (gpt-4o)
+Model:    HuggingFaceTB/SmolLM2-1.7B
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/refusal_HuggingFaceTB_SmolLM2-1.7B_2513756
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513756
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid006302
+disk_job_dir: 152K
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513756/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating refusal Probe ===
+Loading labeled data...
+Loading labels from: labeled_data.jsonl
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/codex_gpt-4o_1h/refusal_HuggingFaceTB_SmolLM2-1.7B_2513756

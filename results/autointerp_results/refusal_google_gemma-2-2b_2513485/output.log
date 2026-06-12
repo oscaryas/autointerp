@@ -1,0 +1,47 @@
+refusal claude google/gemma-2-2b 2513485 1 claude-opus-4-6 1
+Preparing job directory...
+================================
+========= RUNNING TASK =========
+================================
+Task:     refusal
+Agent:    claude (claude-opus-4-6)
+Model:    google/gemma-2-2b
+Job dir:  /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/jobs/refusal_google_gemma-2-2b_2513485
+Eval dir: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_google_gemma-2-2b_2513485
+--- SOLVE DIAGNOSTICS ---
+exit_code: 0
+status: exited normally
+hostname: nid007526
+disk_job_dir: 4.0M
+--- END SOLVE DIAGNOSTICS ---
+Parsed trace saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_google_gemma-2-2b_2513485/solve_parsed.txt
+================================
+========= EVALUATING ===========
+================================
+=== Evaluating refusal Probe ===
+Loading labeled data...
+Loading labels from: behavioral_labels.jsonl
+Loaded 800 examples
+Loading model: google/gemma-2-2b
+Loading probe from: final_probe
+Probe metadata: layer=13, aggregation=mean
+Extracting activations...
+Activations shape: (800, 2304)
+Evaluating probe...
+
+=== Results ===
+Accuracy:  0.936
+Precision: 0.887
+Recall:    1.000
+F1 Score:  0.940
+ROC-AUC:   0.997
+Layer:     13
+Aggregation: mean
+
+Metrics saved to: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_google_gemma-2-2b_2513485/metrics.json
+=== Evaluation Complete ===
+================================
+===== COLLECTING ARTIFACTS =====
+================================
+=== Task Complete ===
+Results: /iopsstor/scratch/cscs/oyasunaga/autointerp_runs/results/claude_claude-opus-4-6_1h/refusal_google_gemma-2-2b_2513485
