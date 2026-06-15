@@ -1,4 +1,0 @@
-[2026-05-27 11:29:18 UTC] Error: Input must be provided either through stdin or as a prompt argument when using --print
-srun: error: nid006069: task 0: Terminated
-srun: Terminating StepId=2407265.0
-srun: Force Terminated StepId=2407265.0
