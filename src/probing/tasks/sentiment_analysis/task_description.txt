@@ -1,32 +1,58 @@
 Sentiment Analysis Probing
 
-Task: Probe whether the model internally represents sentiment by measuring whether it can correctly classify sentiment from text.
+Task: Probe whether the model internally represents sentiment and emotion by training linear probes to predict ground truth labels directly from activations — not from model outputs.
 
-Behavioral Labeling (you must do this first):
-For each example in labeled_data.jsonl, run the model to classify the sentiment of the text (positive or negative). Compare the model's prediction to the `ground_truth_sentiment` field (0=negative, 1=positive). Assign:
-- label=1 if the model correctly identifies the sentiment
-- label=0 if the model misclassifies the sentiment
-Save these behavioral labels to `behavioral_labels.jsonl`.
+Objective: Train linear probes on model activations to predict the ground truth sentiment/emotion label of a text. This reveals which layers encode sentiment and emotion information as internal representations, independent of what the model outputs.
 
-Objective: Train linear probes on model activations to predict whether the model will correctly classify the sentiment of a given text. This reveals which layers encode sentiment information most strongly.
+Step 1 — Load datasets:
+labeled_data.jsonl contains 1000 IMDB movie reviews (500 positive, 500 negative) with a `ground_truth_sentiment` field (0=negative, 1=positive). Use these directly as probe labels — no model inference needed for labeling.
+
+In addition, load the following datasets from HuggingFace using the `datasets` library:
+
+Binary sentiment datasets (use ground truth labels directly):
+- SST-2:           load_dataset("stanfordnlp/sst2"),       split="validation", label field="label"         (0=negative, 1=positive)
+- Rotten Tomatoes: load_dataset("rotten_tomatoes"),         split="test",       label field="label"         (0=negative, 1=positive)
+
+Fine-grained emotion dataset (6-class):
+- Emotion:         load_dataset("dair-ai/emotion"),         split="test",       label field="label"
+  Labels: 0=sadness, 1=joy, 2=love, 3=anger, 4=fear, 5=surprise
+
+Sample up to 1000 examples per dataset split, balanced across labels where possible. Save each as a separate JSONL file: `sst2_data.jsonl`, `rotten_tomatoes_data.jsonl`, `emotion_data.jsonl` (same schema as labeled_data.jsonl: `text`, `label`, `metadata`).
+
+Step 2 — Extract activations and train probes:
+For each dataset, extract activations from the model and train a logistic regression probe to predict the ground truth label.
+
+Test all six pooling strategies for aggregating token activations:
+- mean:              average across all token positions
+- last:              final token only
+- max:               elementwise maximum across positions
+- min:               elementwise minimum across positions
+- concat-mean-max-min: concatenate mean, max, and min vectors (3× hidden dim)
+- attention-weighted: weighted mean using softmax of per-token L2 norms as weights
+
+Train a separate probe for each combination of (dataset × layer × pooling method). Use cross-validation for robust estimates.
+
+Step 3 — Compare across tasks:
+Train probes on binary sentiment (IMDB, SST-2, Rotten Tomatoes) and fine-grained emotion (Emotion dataset) separately. Note which layers are most informative for each — research suggests binary sentiment peaks in mid-layers while fine-grained emotion is strongest in early layers.
 
 Questions to answer:
-1. Which layers best predict whether the model will classify sentiment correctly?
-2. Which token positions are most informative (first, last, mean-pooled, max-pooled)?
-3. How accurately can a simple linear probe predict the model's sentiment classification behavior?
-
-Dataset: 1000 IMDB movie reviews (500 positive, 500 negative). The `ground_truth_sentiment` field gives the true label for comparison.
+1. Which layers best encode binary sentiment vs fine-grained emotion?
+2. Which pooling strategy is most informative, and does it differ by task?
+3. Do probes trained on one binary sentiment dataset (e.g. IMDB) generalize to others (SST-2, Rotten Tomatoes)?
+4. Is emotion linearly separable in the model's representation space?
+5. How does probe accuracy compare across the 6 emotion classes?
 
 Expected Analysis:
-- Probe all layers of the model
-- Test different token aggregation strategies
+- Probe all layers of the model for each dataset
+- Test all six pooling strategies
 - Use cross-validation for robust estimates
-- Report accuracy, precision, recall, F1, ROC-AUC
-- Visualize probe performance across layers
+- Report accuracy, precision, recall, F1, ROC-AUC per layer and pooling method
+- Visualize probe performance across layers for both binary sentiment and emotion
+- Plot per-class accuracy for the 6-class emotion task
 
 Deliverables:
-1. behavioral_labels.jsonl — your assigned labels based on model behavior
-2. Trained probe saved to `final_probe/` directory
+1. sst2_data.jsonl, rotten_tomatoes_data.jsonl, emotion_data.jsonl — loaded datasets
+2. Trained probe saved to `final_probe/` directory (best performing across all combinations)
 3. Metrics in JSON format
 4. Visualizations of results (PNG/PDF)
-5. Written analysis of findings
+5. Written analysis covering: best layers per task, best pooling strategy, cross-dataset generalization

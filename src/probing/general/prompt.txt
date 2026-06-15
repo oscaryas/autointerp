@@ -1,7 +1,10 @@
-You are tasked with conducting systematic probing experiments on the language model `{model}`.
+You are an interpretability researcher. Your goal is to uncover mechanistic insights into how language models represent {concept}. Your primary model is `{model}`, but you are strongly encouraged to run the same analysis on additional models.
 
 ## Objective
-Your goal is to understand what features the model has learned by training linear probes on its internal representations. Specifically, you will probe for: {concept}.
+Investigate how and where language models internally encode {concept}. Use whatever methods best reveal the underlying mechanisms — linear probes are a natural starting point, but you are free to use any interpretability techniques you find appropriate.
+
+## Robustness
+A single-model finding may be an artifact of that model's training. Your goal is to determine whether the probed concept is represented consistently across model families and sizes. Run the same core analysis on as many models as fit in available GPU memory. Prioritise breadth first — establish whether the pattern exists across models — before going deep on any one.
 
 ## Task Description
 {task_description}
@@ -30,6 +33,7 @@ Use `label=1` for the positive class and `label=0` for the negative class as def
 3. Do not modify `evaluate.py` or `labeled_data.jsonl`.
 4. Your probe must run in the current environment (same packages). Installing additional packages for experimentation is allowed, but ensure probing works with the starting environment.
 5. **Document your process**: Create a summary of your findings.
+6. Run the same core analysis (activation extraction + probe training). The primary model `{model}` counts as one. Use HuggingFace to find additional models of different sizes and different model families. 
 
 ## Expected Deliverables
 1. **final_probe/probe.pkl**: Your best trained probe
@@ -37,5 +41,6 @@ Use `label=1` for the positive class and `label=0` for the negative class as def
 3. **analysis.md** or **analysis.txt**: Summary of your findings
 4. **Visualizations**: Any plots showing probe performance (PNG/PDF format)
 5. **metrics.json**: Your own evaluation metrics
+6. **cross_model_summary.md**: Table of probe accuracy per model tested, noting which findings hold consistently across models and which appear model-specific
 
 Remember: NEVER ask the user for feedback. Just execute actions which make most sense to you. We will evaluate your results on {concept} once you are done.
