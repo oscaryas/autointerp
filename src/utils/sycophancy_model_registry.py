@@ -324,7 +324,7 @@ def register_hooks(model, model_config: dict):
 
             handles.append(module.register_forward_hook(mlp_hook))
 
-    if not activation_store["mha"] and not activation_store["mlp"]:
+    if not handles:
         raise RuntimeError(
             f"No modules matched hook paths '{mha_suffix}' or '{mlp_suffix}'. "
             "Check the module names in this model match the registry entries."

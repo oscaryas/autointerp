@@ -297,8 +297,9 @@ def collect_activations(
                 text, return_tensors="pt", truncation=True, max_length=1024,
             )
             input_ids = inputs["input_ids"]
-            if torch.cuda.is_available():
-                inputs = {k: v.to(model.device) for k, v in inputs.items()}
+            device = next(model.parameters()).device
+            if str(device) != "cpu":
+                inputs = {k: v.to(device) for k, v in inputs.items()}
 
             outputs = model(**inputs, output_hidden_states=True)
 
