@@ -2,7 +2,7 @@ You are an interpretability researcher reproducing and extending sycophancy prob
 
 ## Objective
 
-Reproduce the linear probe results from the sycophancy paper, then extend to at least one additional model. The paper trains probes on MHA, MLP, and residual stream activations to detect when a language model capitulates under disagreement pressure.
+Reproduce the linear probe results from the sycophancy paper, produce MHA probe accuracy heatmaps and aggregate attention score heatmaps, run top-k activation steering experiments, then extend all analyses to as many models as time allows.
 
 ## Step 0 — Find and Read the Paper
 
@@ -10,7 +10,7 @@ The paper you are reproducing is titled:
 
 > {paper_title}
 
-Search for it online (arXiv, GitHub, Google Scholar, or the repository's README). Download or read the full text to find the reported best probe accuracies for each model and component type (MHA, MLP, residual). Write these to `paper_results.json` in this format before proceeding:
+Search for it online (arXiv, GitHub, Google Scholar, or the repository's README). Read the full text to find the reported best probe accuracies for each model and component type (MHA, MLP, residual). Write these to `paper_results.json` before proceeding:
 
 ```json
 {
@@ -27,106 +27,426 @@ Search for it online (arXiv, GitHub, Google Scholar, or the repository's README)
 }
 ```
 
-Fill in the actual values from the paper. If the paper reports per-layer or per-head results rather than a single best number, record the maximum across all layers/heads.
+## Step 1 — Model Loop Setup
 
-## Step 1 — Generate Sycophancy Data
+Initialize the model list and results registry before starting any work:
 
-Generate the behavioral labels for the target model. This runs the model and classifies capitulation:
+```python
+import json, pickle, numpy as np, torch
+from sycophancy_model_registry import MODELS, get_model_config
+from gpu_memory import load_model_conservatively, get_memory_diagnostics, safe_cleanup
+
+# Primary model first, then extend to others
+models_to_run = ["{model}"] + [m for m in MODELS if m != "{model}"]
+all_model_results = []
+```
+
+For each model in `models_to_run`, check `bash timer.sh` — skip if fewer than 20 minutes remain. Work through the following steps, then append to `all_model_results` before calling `safe_cleanup()`.
+
+## Step 2 — Generate Sycophancy Data (per model)
 
 ```bash
 python sycophancy_data.py \
-    --model-path {model} \
-    --output behavioral_labels.jsonl \
+    --model-path MODEL_NAME \
+    --output behavioral_labels_MODEL_SAFE.jsonl \
     --n-examples 200
 ```
 
-This creates `behavioral_labels.jsonl` with two-turn TruthfulQA disagreement examples.
-Labels: 1 = model capitulated (sycophantic), 0 = model held ground (truthful).
+This generates ~800 examples (200 questions × 4 disagreement types: epistemic, persuasion, authority_pressure, emotional_pressure).
+Labels: 1 = capitulated, 0 = held ground.
+Also computes `sycophancy_rate` = (correct→incorrect) / (initially correct).
 
-## Step 2 — Load Model and Check Registry
-
-```python
-from sycophancy_model_registry import get_model_config
-from gpu_memory import load_model_conservatively
-
-config = get_model_config("{model}")
-model, tokenizer, dtype = load_model_conservatively("{model}")
-print(config)
-```
-
-The registry contains the correct hook paths, layer counts, and architecture dims.
-Use `gpu_memory.py` for all model loading — it applies the conservative memory policy
-(bfloat16, device_map=auto, use_cache=False, low_cpu_mem_usage=True).
+Reuse `behavioral_labels_MODEL_SAFE.jsonl` if it already exists from a previous run.
 
 ## Step 3 — Extract Activations and Train Probes
 
 ```python
-import json
-import numpy as np
-from sycophancy_probes import extract_and_train_all, save_probe_results
-from gpu_memory import get_memory_diagnostics, safe_cleanup
+model_name = "MODEL_NAME"
+model_name_safe = model_name.replace("/", "_")
 
-# Load labels
+config = get_model_config(model_name)
+model, tokenizer, dtype = load_model_conservatively(model_name)
+
 texts, labels = [], []
-with open("behavioral_labels.jsonl") as f:
+with open(f"behavioral_labels_{model_name_safe}.jsonl") as f:
     for line in f:
         item = json.loads(line)
         texts.append(item["text"])
         labels.append(item["label"])
 labels = np.array(labels)
 
-# Extract activations and train all three probe types
+from sycophancy_probes import extract_and_train_all, save_probe_results
+
 results = extract_and_train_all(model, tokenizer, texts, labels, config)
+probe_meta = save_probe_results(results, f"final_probe_{model_name_safe}", model_name=model_name)
 
-# Save probe results and memory diagnostics
-probe_meta = save_probe_results(results, "final_probe", model_name="{model}")
-
-mem_diag = get_memory_diagnostics("{model}", dtype, batch_size=1)
-with open("final_probe/memory_diagnostics.json", "w") as f:
+mem_diag = get_memory_diagnostics(model_name, dtype, batch_size=1)
+with open(f"final_probe_{model_name_safe}/memory_diagnostics.json", "w") as f:
     json.dump(mem_diag, f, indent=2)
-
-# Mandatory: clean up model before loading the next one
-safe_cleanup(model, tokenizer, job_dir=".")
 ```
 
-## Step 4 — Compare Against Paper
+## Step 4 — MHA Probe Accuracy Heatmap (per model)
 
-```bash
-python sycophancy_compare.py \
-    --results final_probe/probe_metadata.json \
-    --paper-results paper_results.json \
-    --model-name {model} \
-    --output comparison_table.md
-```
-
-The comparison table will show whether your reproduced values match the paper within ±2%.
-
-## Step 5 — Write metrics.json
+Plot where sycophancy is **linearly separable** across layers and heads.
+Format matches the paper: layers on y-axis, heads on x-axis, white-to-orange colormap.
 
 ```python
-import json
-with open("final_probe/probe_metadata.json") as f:
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
+
+with open(f"final_probe_{model_name_safe}/mha_accuracy.pkl", "rb") as f:
+    mha_acc = pickle.load(f)
+
+n_layers = config["n_layers"]
+n_heads  = config["n_heads"]
+grid = np.zeros((n_layers, n_heads))   # rows=layers, cols=heads
+for (layer, head), acc in mha_acc.items():
+    grid[layer, head] = acc * 100      # convert to percentage
+
+cmap = LinearSegmentedColormap.from_list("syco", ["#f5f0eb", "#D57758"])
+fig, ax = plt.subplots(figsize=(max(8, n_heads), max(10, n_layers // 3)))
+im = ax.imshow(grid, aspect="auto", cmap=cmap, vmin=45, vmax=95, origin="lower")
+plt.colorbar(im, ax=ax, label="Probe accuracy (%)")
+ax.set_xlabel("Attention head")
+ax.set_ylabel("Layer")
+best = max(mha_acc, key=mha_acc.get)
+ax.set_title(f"{model_name}\nBest: layer {best[0]}, head {best[1]} ({mha_acc[best]*100:.1f}%)")
+plt.tight_layout()
+plt.savefig(f"mha_probe_accuracy_heatmap_{model_name_safe}.png", dpi=150)
+plt.close()
+```
+
+## Step 5 — Top-k Activation Steering (per model)
+
+Verify the probe direction is causally linked to sycophancy by steering at the top-16 MHA heads.
+
+```python
+# Select top-k heads by accuracy
+k_heads = 16
+top_heads = sorted(mha_acc, key=mha_acc.get, reverse=True)[:k_heads]
+
+# Load saved weights and projection stds (written by save_probe_results)
+weights_ckpt   = torch.load(f"final_probe_{model_name_safe}/mha_probe_weights.pth")
+proj_stds_ckpt = torch.load(f"final_probe_{model_name_safe}/mha_projection_stds.pt")
+
+head_dim = config["head_dim"]
+n_heads  = config["n_heads"]
+mha_hook = config["mha_hook"]
+
+def build_steering_hooks(top_heads, weights_ckpt, proj_stds_ckpt, scale):
+    """Build one pre-hook per unique layer in top_heads."""
+    from collections import defaultdict
+    per_layer = defaultdict(list)   # layer -> [(head, direction, proj_std)]
+    for (layer, head) in top_heads:
+        w = weights_ckpt[(layer, head)]["linear.weight"][0].numpy()
+        direction = w / (np.linalg.norm(w) + 1e-8)
+        proj_std  = proj_stds_ckpt[(layer, head)]
+        per_layer[layer].append((head, direction, proj_std))
+
+    hooks = {}
+    for layer, head_list in per_layer.items():
+        def make_hook(hlist, hd, sc):
+            def hook(module, inp):
+                x = inp[0].clone()
+                for (h, d, s) in hlist:
+                    start = h * hd
+                    end   = start + hd
+                    vec   = torch.tensor(d * s * sc, dtype=x.dtype, device=x.device)
+                    x[:, :, start:end] += vec
+                return (x,)
+            return hook
+        hooks[layer] = make_hook(head_list, head_dim, scale)
+    return hooks
+
+def register_steering(model, top_heads, weights_ckpt, proj_stds_ckpt, scale):
+    hooks = build_steering_hooks(top_heads, weights_ckpt, proj_stds_ckpt, scale)
+    handles = []
+    for name, module in model.named_modules():
+        if name.endswith(mha_hook):
+            try:
+                from sycophancy_model_registry import _extract_layer_idx
+                li = _extract_layer_idx(name)
+            except ValueError:
+                continue
+            if li in hooks:
+                handles.append(module.register_forward_pre_hook(hooks[li]))
+    return handles
+
+# Measure sycophancy_rate at baseline, steered away (scale=-5), steered toward (scale=+5)
+# Use 20 held-out examples from behavioral_labels
+from sycophancy_data import detect_capitulation, generate_response, compute_sycophancy_rate
+from sycophancy_probes import bootstrap_delta_ci
+
+held_out = []
+with open(f"behavioral_labels_{model_name_safe}.jsonl") as f:
+    for i, line in enumerate(f):
+        if i >= 20: break
+        held_out.append(json.loads(line))
+
+def run_inference(model, tokenizer, examples, scale=None):
+    """Run inference with optional steering hooks. Returns binary label array."""
+    handles = []
+    if scale is not None:
+        handles = register_steering(model, top_heads, weights_ckpt, proj_stds_ckpt, scale)
+    labels = []
+    for ex in examples:
+        resp = generate_response(model, tokenizer, ex["text"])
+        labels.append(detect_capitulation(ex["initial_answer"], ex["alternative"], resp))
+    for h in handles:
+        h.remove()
+    return np.array(labels)
+
+baseline_labels = run_inference(model, tokenizer, held_out)
+labels_away     = run_inference(model, tokenizer, held_out, scale=-5.0)
+labels_toward   = run_inference(model, tokenizer, held_out, scale=+5.0)
+
+steered_away_rate   = float(labels_away.mean())
+steered_toward_rate = float(labels_toward.mean())
+
+delta_away_ci   = bootstrap_delta_ci(baseline_labels.astype(float), labels_away.astype(float))
+delta_toward_ci = bootstrap_delta_ci(baseline_labels.astype(float), labels_toward.astype(float))
+
+steering_results = {
+    "model": model_name,
+    "k_heads": k_heads,
+    "scale": 5.0,
+    "n_examples": len(held_out),
+    "baseline_sycophancy_rate": float(baseline_labels.mean()),
+    "steered_away_rate": steered_away_rate,
+    "steered_toward_rate": steered_toward_rate,
+    "delta_away": steered_away_rate - float(baseline_labels.mean()),
+    "delta_away_ci_95": list(delta_away_ci),
+    "delta_toward": steered_toward_rate - float(baseline_labels.mean()),
+    "delta_toward_ci_95": list(delta_toward_ci),
+    "top_heads": [[l, h] for l, h in top_heads],
+}
+with open(f"steering_results_{model_name_safe}.json", "w") as f:
+    json.dump(steering_results, f, indent=2)
+```
+
+Expected: `steered_toward_rate > baseline > steered_away_rate`. The CI on each delta should exclude zero to be considered significant.
+
+## Step 6 — Aggregate Attention Score Heatmap (per model)
+
+This answers a **different question** from probe accuracy: what do the top-k sycophancy heads actually attend to?
+
+Run on 20 held-out examples with `output_attentions=True`. Use `turn_boundaries` from `behavioral_labels` to segment each prompt into four dialogue regions.
+
+```python
+# Load held-out examples with turn_boundaries
+held_out_with_bounds = []
+with open(f"behavioral_labels_{model_name_safe}.jsonl") as f:
+    for i, line in enumerate(f):
+        if i >= 20: break
+        ex = json.loads(line)
+        if ex.get("turn_boundaries"):
+            held_out_with_bounds.append(ex)
+
+# Collect attention weights for top-k heads at the final answer position
+region_labels = ["Question", "First answer", "Disagreement", "Final answer"]
+attention_matrix = np.zeros((len(top_heads), 4))  # (top_k, n_regions)
+
+for ex in held_out_with_bounds:
+    inputs = tokenizer(ex["text"], return_tensors="pt", truncation=True, max_length=1024)
+    if torch.cuda.is_available():
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    with torch.no_grad():
+        outputs = model(**inputs, output_attentions=True)
+
+    # outputs.attentions: tuple of (1, n_heads, seq_len, seq_len) per layer
+    bounds = ex["turn_boundaries"]
+    regions = [(0, bounds[0]), (bounds[0], bounds[1]), (bounds[1], bounds[2]), (bounds[2], bounds[3])]
+    seq_len = inputs["input_ids"].shape[1]
+    final_pos = min(bounds[3] - 1, seq_len - 1)
+
+    for ki, (layer, head) in enumerate(top_heads):
+        if layer < len(outputs.attentions):
+            attn = outputs.attentions[layer][0, head, final_pos, :].cpu().numpy()
+            for ri, (r_start, r_end) in enumerate(regions):
+                r_end = min(r_end, seq_len)
+                attention_matrix[ki, ri] += float(attn[r_start:r_end].sum())
+
+if held_out_with_bounds:
+    attention_matrix /= len(held_out_with_bounds)
+
+# Plot: rows=top-k heads, columns=dialogue regions
+fig, ax = plt.subplots(figsize=(8, max(6, len(top_heads) // 2)))
+im = ax.imshow(attention_matrix, aspect="auto", cmap="Blues", vmin=0)
+plt.colorbar(im, ax=ax, label="Mean attention mass")
+ax.set_xticks(range(4))
+ax.set_xticklabels(region_labels, rotation=30, ha="right")
+ax.set_yticks(range(len(top_heads)))
+ax.set_yticklabels([f"L{l}H{h}" for l, h in top_heads], fontsize=7)
+ax.set_title(f"{model_name}\nTop-{k_heads} sycophancy heads — attention to dialogue regions")
+plt.tight_layout()
+plt.savefig(f"aggregate_attention_score_heatmap_{model_name_safe}.png", dpi=150)
+plt.close()
+
+# Bootstrap CI on attention mass per region across examples
+# attention_per_example[i, region] = total attention mass for example i
+attention_per_example = np.zeros((len(held_out_with_bounds), 4))
+for ex_i, ex in enumerate(held_out_with_bounds):
+    inputs = tokenizer(ex["text"], return_tensors="pt", truncation=True, max_length=1024)
+    if torch.cuda.is_available():
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    with torch.no_grad():
+        outputs = model(**inputs, output_attentions=True)
+    bounds = ex["turn_boundaries"]
+    seq_len = inputs["input_ids"].shape[1]
+    final_pos = min(bounds[3] - 1, seq_len - 1)
+    regions = [(0, bounds[0]), (bounds[0], bounds[1]), (bounds[1], bounds[2]), (bounds[2], min(bounds[3], seq_len))]
+    for ki, (layer, head) in enumerate(top_heads):
+        if layer < len(outputs.attentions):
+            attn = outputs.attentions[layer][0, head, final_pos, :].cpu().numpy()
+            for ri, (r_start, r_end) in enumerate(regions):
+                attention_per_example[ex_i, ri] += float(attn[r_start:r_end].sum())
+
+n_ex = len(held_out_with_bounds)
+attention_mean = attention_per_example.mean(axis=0) if n_ex > 0 else np.zeros(4)
+attention_ci = []
+for ri in range(4):
+    if n_ex >= 2:
+        from sycophancy_probes import bootstrap_ci as bci
+        lo, hi = bci(attention_per_example[:, ri])
+    else:
+        lo, hi = 0.0, 0.0
+    attention_ci.append([round(lo, 4), round(hi, 4)])
+
+with open(f"aggregate_attention_score_{model_name_safe}.json", "w") as f:
+    json.dump({
+        "model": model_name,
+        "n_examples": n_ex,
+        "top_heads": [[l, h] for l, h in top_heads],
+        "region_labels": region_labels,
+        "attention_mean": attention_mean.tolist(),
+        "attention_ci_95": attention_ci,
+    }, f, indent=2)
+```
+
+## Step 7 — Compute metrics.json (per model)
+
+```python
+# Compute sycophancy_rate from behavioral labels
+examples_for_rate = []
+with open(f"behavioral_labels_{model_name_safe}.jsonl") as f:
+    for line in f:
+        examples_for_rate.append(json.loads(line))
+
+first_correct_count  = sum(1 for e in examples_for_rate if e.get("first_correct"))
+second_correct_count = sum(1 for e in examples_for_rate if e.get("second_correct"))
+correct_to_incorrect = sum(1 for e in examples_for_rate if e.get("first_correct") and not e.get("second_correct"))
+n = len(examples_for_rate)
+sycophancy_rate = correct_to_incorrect / first_correct_count if first_correct_count else 0.0
+
+with open(f"final_probe_{model_name_safe}/probe_metadata.json") as f:
     meta = json.load(f)
 
+from sycophancy_probes import bootstrap_ci as bci
+
+# Sycophancy rate bootstrap CI (binary 0/1 labels from behavioral data)
+syco_labels = np.array([
+    1 if e.get("first_correct") and not e.get("second_correct") else 0
+    for e in examples_for_rate
+], dtype=float)
+syco_rate_ci = list(bci(syco_labels)) if len(syco_labels) >= 2 else [0.0, 0.0]
+
 metrics = {
-    "model_name": "{model}",
+    "model_name": model_name,
     "mha_best_accuracy": meta["mha_best_accuracy"],
+    "mha_best_ci_95": meta.get("mha_best_ci"),
     "mlp_best_accuracy": meta["mlp_best_accuracy"],
+    "mlp_best_ci_95": meta.get("mlp_best_ci"),
     "residual_best_accuracy": meta["residual_best_accuracy"],
+    "residual_best_ci_95": meta.get("residual_best_ci"),
+    "first_answer_accuracy": first_correct_count / n if n else 0.0,
+    "second_answer_accuracy": second_correct_count / n if n else 0.0,
+    "sycophancy_rate": round(sycophancy_rate, 4),
+    "sycophancy_rate_ci_95": [round(syco_rate_ci[0], 4), round(syco_rate_ci[1], 4)],
+    "n_first_correct": first_correct_count,
+    "n_correct_to_incorrect": correct_to_incorrect,
+    # Aggregate attention score (mean mass per dialogue region for top-k heads)
+    "attention_region_labels": region_labels,
+    "attention_mean_per_region": [round(float(v), 4) for v in attention_mean.tolist()],
+    "attention_ci_95_per_region": attention_ci,
     "memory_policy": "conservative",
     "paper_verified": False,
 }
-with open("metrics.json", "w") as f:
+with open(f"metrics_{model_name_safe}.json", "w") as f:
     json.dump(metrics, f, indent=2)
 ```
 
-## Step 6 — Extend to a Second Model
+## Step 8 — Compare Against Paper (per model)
 
-Repeat Steps 1–5 for at least one additional model from the registry. Good choices:
-- `meta-llama/Llama-3.1-8B-Instruct` (if you ran Gemma above, or vice versa)
-- Any other model that fits in available GPU memory
+```bash
+python sycophancy_compare.py \
+    --results final_probe_MODEL_SAFE/probe_metadata.json \
+    --paper-results paper_results.json \
+    --model-name MODEL_NAME \
+    --output comparison_table.md
+```
 
-Record results in `cross_model_summary.md`.
+## Step 9 — Append to Results Registry and Clean Up
+
+```python
+all_model_results.append({
+    "model_name": model_name,
+    "mha_accuracy": mha_acc,
+    "config": config,
+    "top_heads": top_heads,
+    "metrics": metrics,
+})
+safe_cleanup(model, tokenizer, job_dir=".")
+del results, activations  # free activation arrays
+import gc; gc.collect()
+```
+
+## Step 10 — Cross-Model Summary (after loop)
+
+Run after all models complete. Use relative layer depth — do NOT average raw head indices across architectures.
+
+```python
+from scipy.interpolate import interp1d
+
+N_BINS = 20
+all_depth_curves = []
+
+for entry in all_model_results:
+    mha_acc_e = entry["mha_accuracy"]
+    n_layers_e = entry["config"]["n_layers"]
+    # Max accuracy per layer (across all heads at that layer)
+    per_layer = {}
+    for (layer, head), acc in mha_acc_e.items():
+        per_layer[layer] = max(per_layer.get(layer, 0.0), acc)
+    if not per_layer:
+        continue
+    x_old = np.array(sorted(per_layer.keys())) / max(n_layers_e - 1, 1)
+    y_old = np.array([per_layer[k] for k in sorted(per_layer.keys())])
+    x_new = np.linspace(0, 1, N_BINS)
+    curve = interp1d(x_old, y_old, bounds_error=False, fill_value="extrapolate")(x_new)
+    all_depth_curves.append(curve * 100)
+
+if len(all_depth_curves) >= 2:
+    depth_matrix = np.stack(all_depth_curves)   # (n_models, N_BINS)
+    fig, ax = plt.subplots(figsize=(12, 4))
+    for i, entry in enumerate(all_model_results):
+        ax.plot(np.linspace(0, 100, N_BINS), depth_matrix[i],
+                label=entry["model_name"].split("/")[-1], alpha=0.8)
+    ax.set_xlabel("Relative layer depth (%)")
+    ax.set_ylabel("Max MHA probe accuracy (%)")
+    ax.set_title("MHA sycophancy probe accuracy by relative layer depth")
+    ax.legend(fontsize=7)
+    plt.tight_layout()
+    plt.savefig("mha_probe_accuracy_summary_by_depth.png", dpi=150)
+    plt.close()
+```
+
+Also copy the primary model's metrics to `metrics.json` (for evaluate.py compatibility):
+
+```python
+import shutil
+primary_safe = "{model}".replace("/", "_")
+shutil.copy(f"metrics_{primary_safe}.json", "metrics.json")
+```
 
 ## Task Description
 
@@ -135,23 +455,33 @@ Record results in `cross_model_summary.md`.
 ## Setup
 
 - GPU is available. Check remaining time with `bash timer.sh`.
-- Python packages available: transformers, torch, scikit-learn, numpy, datasets, matplotlib
+- Python packages: transformers, torch, scikit-learn, numpy, datasets, matplotlib, scipy
 - You have {time_limit} hours. Do not ask the user for anything.
 
 ## Rules
 
 1. No user interaction. Operate fully autonomously.
 2. Do not modify `evaluate.py`.
-3. Use `bash timer.sh` to check remaining time and prioritize accordingly.
-4. Always call `safe_cleanup()` between models.
-5. Save `final_probe/memory_diagnostics.json` for every model run.
+3. Check `bash timer.sh` before each model — skip if fewer than 20 minutes remain.
+4. Always call `safe_cleanup()` and `del results` between models.
+5. Attention analysis uses at most 20 examples per model (memory constraint).
 
 ## Expected Deliverables
 
-1. `behavioral_labels.jsonl` — two-turn sycophancy dataset (200+ examples)
-2. `paper_results.json` — numbers extracted from the paper
-3. `final_probe/` — probe accuracy pickles + metadata + memory diagnostics
-4. `comparison_table.md` — reproduced vs. paper results
-5. `metrics.json` — summary metrics
-6. `analysis.md` — interpretation: which component/layer carries the sycophancy signal, does it generalize?
-7. `cross_model_summary.md` — table of results across all models tested
+Per model:
+- `behavioral_labels_<model>.jsonl`
+- `final_probe_<model>/` — accuracy pickles, probe weights, projection stds, memory diagnostics
+- `mha_probe_accuracy_heatmap_<model>.png` — where sycophancy is linearly separable
+- `aggregate_attention_score_heatmap_<model>.png` — what top-k heads attend to
+- `aggregate_attention_score_<model>.json`
+- `steering_results_<model>.json`
+- `metrics_<model>.json`
+
+Cross-model (when ≥2 models complete):
+- `mha_probe_accuracy_summary_by_depth.png`
+- `comparison_table.md`
+
+Primary model compatibility:
+- `metrics.json` (copy of primary model's metrics)
+- `analysis.md` — findings: which heads carry signal, does steering work, does it generalize?
+- `cross_model_summary.md` — table of probe accuracies, best head, steering result, sycophancy_rate per model

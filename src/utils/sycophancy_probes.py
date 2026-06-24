@@ -24,6 +24,54 @@ from torch.optim import Adam
 
 
 # ---------------------------------------------------------------------------
+# Statistics utilities
+# ---------------------------------------------------------------------------
+
+def wilson_ci(n_correct: int, n_total: int, z: float = 1.96) -> tuple:
+    """Wilson score interval for a proportion. Fast — no resampling needed."""
+    if n_total == 0:
+        return (0.0, 0.0)
+    p = n_correct / n_total
+    denom = 1 + z**2 / n_total
+    centre = (p + z**2 / (2 * n_total)) / denom
+    margin = (z * np.sqrt(p * (1 - p) / n_total + z**2 / (4 * n_total**2))) / denom
+    return (max(0.0, centre - margin), min(1.0, centre + margin))
+
+
+def bootstrap_ci(
+    values: np.ndarray,
+    stat_fn=np.mean,
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+) -> tuple:
+    """Bootstrap percentile CI for any statistic over a 1-D array."""
+    rng = np.random.default_rng(42)
+    boots = [stat_fn(rng.choice(values, size=len(values), replace=True))
+             for _ in range(n_bootstrap)]
+    lo = np.percentile(boots, 100 * alpha / 2)
+    hi = np.percentile(boots, 100 * (1 - alpha / 2))
+    return (float(lo), float(hi))
+
+
+def bootstrap_delta_ci(
+    a: np.ndarray,
+    b: np.ndarray,
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+) -> tuple:
+    """Bootstrap CI on the difference mean(b) - mean(a)."""
+    rng = np.random.default_rng(42)
+    deltas = [
+        np.mean(rng.choice(b, size=len(b), replace=True)) -
+        np.mean(rng.choice(a, size=len(a), replace=True))
+        for _ in range(n_bootstrap)
+    ]
+    lo = np.percentile(deltas, 100 * alpha / 2)
+    hi = np.percentile(deltas, 100 * (1 - alpha / 2))
+    return (float(lo), float(hi))
+
+
+# ---------------------------------------------------------------------------
 # Probe model
 # ---------------------------------------------------------------------------
 
@@ -85,9 +133,16 @@ def train_probe(
         train_preds = (probe(X_train) > 0).float()
         train_acc = (train_preds == y_train).float().mean().item()
 
+    n_test = len(y_test)
+    n_correct = int((test_preds == y_test).sum().item())
+    ci_lower, ci_upper = wilson_ci(n_correct, n_test)
+
     return {
         "accuracy": test_acc,
         "train_accuracy": train_acc,
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "n_test": n_test,
         "model_state": probe.state_dict(),
         "input_dim": X.shape[-1],
     }
@@ -103,7 +158,7 @@ def train_mha_probes(
     n_layers: int,
     n_heads: int,
     **probe_kwargs,
-) -> dict:
+) -> tuple:
     """
     Train one probe per (layer, head).
 
@@ -113,15 +168,33 @@ def train_mha_probes(
 
     Returns:
         accuracy_dict: {(layer, head): accuracy}
+        state_dict:    {(layer, head): {"model_state": ..., "proj_std": float}}
     """
     accuracy_dict = {}
+    ci_dict = {}
+    state_dict = {}
     for layer in range(n_layers):
         for head in range(n_heads):
             X = mha_activations[layer, head]   # (n_examples, head_dim)
             result = train_probe(X, labels, **probe_kwargs)
             accuracy_dict[(layer, head)] = result["accuracy"]
-            print(f"  MHA layer={layer} head={head}: acc={result['accuracy']:.3f}")
-    return accuracy_dict
+            ci_dict[(layer, head)] = (result["ci_lower"], result["ci_upper"])
+
+            # Projection std: std of activations projected onto probe direction
+            w = result["model_state"]["linear.weight"][0].numpy()
+            direction = w / (np.linalg.norm(w) + 1e-8)
+            proj_std = float(np.std(X @ direction))
+
+            state_dict[(layer, head)] = {
+                "model_state": result["model_state"],
+                "proj_std": proj_std,
+                "input_dim": result["input_dim"],
+                "ci_lower": result["ci_lower"],
+                "ci_upper": result["ci_upper"],
+            }
+            print(f"  MHA layer={layer} head={head}: acc={result['accuracy']:.3f} "
+                  f"CI=[{result['ci_lower']:.3f},{result['ci_upper']:.3f}]")
+    return accuracy_dict, ci_dict, state_dict
 
 
 def train_mlp_probes(
@@ -141,12 +214,15 @@ def train_mlp_probes(
         accuracy_dict: {layer: accuracy}
     """
     accuracy_dict = {}
+    ci_dict = {}
     for layer in range(n_layers):
         X = mlp_activations[layer]   # (n_examples, hidden_dim)
         result = train_probe(X, labels, **probe_kwargs)
         accuracy_dict[layer] = result["accuracy"]
-        print(f"  MLP layer={layer}: acc={result['accuracy']:.3f}")
-    return accuracy_dict
+        ci_dict[layer] = (result["ci_lower"], result["ci_upper"])
+        print(f"  MLP layer={layer}: acc={result['accuracy']:.3f} "
+              f"CI=[{result['ci_lower']:.3f},{result['ci_upper']:.3f}]")
+    return accuracy_dict, ci_dict
 
 
 def train_residual_probes(
@@ -154,7 +230,7 @@ def train_residual_probes(
     labels: np.ndarray,
     n_layers: int,
     **probe_kwargs,
-) -> dict:
+) -> tuple:
     """
     Train one probe per residual stream layer.
 
@@ -164,14 +240,18 @@ def train_residual_probes(
 
     Returns:
         accuracy_dict: {layer: accuracy}
+        ci_dict:       {layer: (ci_lower, ci_upper)}
     """
     accuracy_dict = {}
+    ci_dict = {}
     for layer in range(n_layers):
         X = residual_activations[layer]   # (n_examples, hidden_dim)
         result = train_probe(X, labels, **probe_kwargs)
         accuracy_dict[layer] = result["accuracy"]
-        print(f"  Residual layer={layer}: acc={result['accuracy']:.3f}")
-    return accuracy_dict
+        ci_dict[layer] = (result["ci_lower"], result["ci_upper"])
+        print(f"  Residual layer={layer}: acc={result['accuracy']:.3f} "
+              f"CI=[{result['ci_lower']:.3f},{result['ci_upper']:.3f}]")
+    return accuracy_dict, ci_dict
 
 
 # ---------------------------------------------------------------------------
@@ -294,18 +374,23 @@ def extract_and_train_all(
     activations = collect_activations(model, tokenizer, texts, model_config, batch_size)
 
     print(f"\nTraining MHA probes ({n_layers} layers × {n_heads} heads)...")
-    mha_acc = train_mha_probes(activations["mha"], labels, n_layers, n_heads)
+    mha_acc, mha_ci, mha_states = train_mha_probes(activations["mha"], labels, n_layers, n_heads)
 
     print(f"\nTraining MLP probes ({n_layers} layers)...")
-    mlp_acc = train_mlp_probes(activations["mlp"], labels, n_layers)
+    mlp_acc, mlp_ci = train_mlp_probes(activations["mlp"], labels, n_layers)
 
     print(f"\nTraining residual probes ({n_layers} layers)...")
-    res_acc = train_residual_probes(activations["residual"], labels, n_layers)
+    res_acc, res_ci = train_residual_probes(activations["residual"], labels, n_layers)
 
     return {
         "mha_accuracy": mha_acc,
+        "mha_ci": mha_ci,
+        "mha_states": mha_states,
         "mlp_accuracy": mlp_acc,
+        "mlp_ci": mlp_ci,
         "residual_accuracy": res_acc,
+        "residual_ci": res_ci,
+        "activations": activations,   # kept for attention analysis; caller should del after use
     }
 
 
@@ -315,12 +400,14 @@ def extract_and_train_all(
 
 def save_probe_results(results: dict, output_dir: str, model_name: str = ""):
     """
-    Save accuracy dicts as pickles and write a summary JSON.
+    Save accuracy dicts, probe weights, and projection stds.
 
     Structure written to output_dir/:
-        mha_accuracy.pkl
-        mlp_accuracy.pkl
-        residual_accuracy.pkl
+        mha_accuracy.pkl              — {(layer, head): accuracy}
+        mlp_accuracy.pkl              — {layer: accuracy}
+        residual_accuracy.pkl         — {layer: accuracy}
+        mha_probe_weights.pth         — single checkpoint {(layer, head): state_dict}
+        mha_projection_stds.pt        — single checkpoint {(layer, head): proj_std}
         probe_metadata.json
     """
     out = Path(output_dir)
@@ -333,6 +420,24 @@ def save_probe_results(results: dict, output_dir: str, model_name: str = ""):
     with open(out / "residual_accuracy.pkl", "wb") as f:
         pickle.dump(results["residual_accuracy"], f)
 
+    # Save CI dicts
+    if "mha_ci" in results:
+        with open(out / "mha_ci.pkl", "wb") as f:
+            pickle.dump(results["mha_ci"], f)
+    if "mlp_ci" in results:
+        with open(out / "mlp_ci.pkl", "wb") as f:
+            pickle.dump(results["mlp_ci"], f)
+    if "residual_ci" in results:
+        with open(out / "residual_ci.pkl", "wb") as f:
+            pickle.dump(results["residual_ci"], f)
+
+    # Save probe weights and projection stds as single checkpoints
+    if "mha_states" in results and results["mha_states"]:
+        weights_ckpt = {k: v["model_state"] for k, v in results["mha_states"].items()}
+        proj_stds_ckpt = {k: v["proj_std"] for k, v in results["mha_states"].items()}
+        torch.save(weights_ckpt, out / "mha_probe_weights.pth")
+        torch.save(proj_stds_ckpt, out / "mha_projection_stds.pt")
+
     mha_best = max(results["mha_accuracy"].values()) if results["mha_accuracy"] else 0.0
     mlp_best = max(results["mlp_accuracy"].values()) if results["mlp_accuracy"] else 0.0
     res_best = max(results["residual_accuracy"].values()) if results["residual_accuracy"] else 0.0
@@ -341,14 +446,26 @@ def save_probe_results(results: dict, output_dir: str, model_name: str = ""):
     mlp_best_key = max(results["mlp_accuracy"], key=results["mlp_accuracy"].get) if results["mlp_accuracy"] else None
     res_best_key = max(results["residual_accuracy"], key=results["residual_accuracy"].get) if results["residual_accuracy"] else None
 
+    # Best CI for each component type
+    mha_ci = results.get("mha_ci", {})
+    mlp_ci = results.get("mlp_ci", {})
+    res_ci = results.get("residual_ci", {})
+
+    mha_best_ci = mha_ci.get(mha_best_key, (None, None)) if mha_best_key else (None, None)
+    mlp_best_ci = mlp_ci.get(mlp_best_key, (None, None)) if mlp_best_key else (None, None)
+    res_best_ci = res_ci.get(res_best_key, (None, None)) if res_best_key else (None, None)
+
     metadata = {
         "model_name": model_name,
         "mha_best_accuracy": round(mha_best, 4),
         "mha_best_key": list(mha_best_key) if mha_best_key is not None else None,
+        "mha_best_ci": [round(mha_best_ci[0], 4), round(mha_best_ci[1], 4)] if mha_best_ci[0] is not None else None,
         "mlp_best_accuracy": round(mlp_best, 4),
         "mlp_best_key": mlp_best_key,
+        "mlp_best_ci": [round(mlp_best_ci[0], 4), round(mlp_best_ci[1], 4)] if mlp_best_ci[0] is not None else None,
         "residual_best_accuracy": round(res_best, 4),
         "residual_best_key": res_best_key,
+        "residual_best_ci": [round(res_best_ci[0], 4), round(res_best_ci[1], 4)] if res_best_ci[0] is not None else None,
     }
     with open(out / "probe_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
