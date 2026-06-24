@@ -1,7 +1,7 @@
 import inspect
 import json
 from pathlib import Path
-from typing import Callable, Literal, get_args, get_origin, get_type_hints
+from typing import Literal, get_args, get_origin, get_type_hints
 
 SKILLS_DIR: Path | None = None
 
@@ -62,7 +62,8 @@ MAX_OUTPUT_CHARS = 8000
 
 def _truncate(text: str) -> str:
     if len(text) > MAX_OUTPUT_CHARS:
-        return text[:MAX_OUTPUT_CHARS] + f"\n...[truncated, {len(text)} chars total]"
+        suffix = f"\n...[truncated, {len(text)} chars total]"
+        return text[:MAX_OUTPUT_CHARS - len(suffix)] + suffix
     return text
 
 
@@ -107,6 +108,8 @@ def _run_anthropic_loop(system_prompt, user_prompt, schemas, registry, model, ma
                 })
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
+        else:
+            break  # model signalled tool_use but sent no tool_use blocks
 
     return "error: max_iterations reached"
 
@@ -175,4 +178,4 @@ def run_tool_loop(
     elif model.startswith("gpt-"):
         return _run_openai_loop(system_prompt, user_prompt, schemas, registry, model, max_iterations)
     else:
-        raise ValueError(f"Unknown model prefix in '{model}'. Expected 'claude-' or 'gpt-'.")
+        return f"error: unknown model prefix in '{model}'. Expected 'claude-' or 'gpt-'."
