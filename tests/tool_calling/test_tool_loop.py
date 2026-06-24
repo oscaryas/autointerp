@@ -147,3 +147,20 @@ def test_anthropic_loop_tool_call():
 
     assert call_log == ["hello"]
     assert result == "Done."
+
+
+def test_build_system_prompt():
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src" / "tool_calling"))
+    from run_agent import build_system_prompt
+
+    prompt = build_system_prompt(
+        task="sycophancy",
+        model_path="google/gemma-3-12b-it",
+        skill_names=["generate_data", "inspect_model"],
+        tool_names=["load_model", "inspect_model"],
+    )
+    assert "sycophancy" in prompt
+    assert "google/gemma-3-12b-it" in prompt
+    assert "generate_data" in prompt
+    assert "load_model" in prompt
+    assert "Do not ask for user input" in prompt
