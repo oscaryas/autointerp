@@ -12,6 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/commit_utils/set_env_vars.sh"
 
 MODEL_SAFE=$(echo "$MODEL" | tr '/:[]' '____')
 AGENT_CONFIG_SAFE=$(echo "$AGENT_CONFIG" | tr '/:[]' '____')
+export TASK MODEL
 
 EVAL_DIR="${AUTOINTERP_RESULTS_DIR}/${AGENT}_${AGENT_CONFIG_SAFE}_${NUM_HOURS}h${AUTOINTERP_EXPERIMENT_NAME}/${TASK}_${MODEL_SAFE}_${CLUSTER_ID}"
 mkdir -p "$EVAL_DIR"
