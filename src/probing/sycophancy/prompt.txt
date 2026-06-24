@@ -29,15 +29,48 @@ Search for it online (arXiv, GitHub, Google Scholar, or the repository's README)
 
 ## Step 1 — Model Loop Setup
 
-Initialize the model list and results registry before starting any work:
+Before starting, check which models are already downloaded locally. Only add models that are cached — do not download anything mid-job.
 
 ```python
-import json, pickle, numpy as np, torch
+import json, pickle, numpy as np, torch, os
+from pathlib import Path
 from sycophancy_model_registry import MODELS, get_model_config
 from gpu_memory import load_model_conservatively, get_memory_diagnostics, safe_cleanup
 
-# Primary model first, then extend to others
-models_to_run = ["{model}"] + [m for m in MODELS if m != "{model}"]
+def is_cached(model_name: str) -> bool:
+    """Return True if the model has at least one safetensors shard in HF_HOME."""
+    hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+    model_safe = model_name.replace("/", "--")
+    hub_dir = Path(hf_home) / "hub"
+    matches = list(hub_dir.glob(f"models--{model_safe}/snapshots/**/*.safetensors"))
+    return len(matches) > 0
+
+# Build models_to_run from locally cached models only
+# Always start with the primary model, then add others in order of preference
+preferred_order = [
+    "{model}",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-3-12b-it",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B",
+    "google/gemma-3-27b-it",
+    "meta-llama/Llama-3.1-70B-Instruct",
+]
+# Deduplicate while preserving order
+seen = set()
+candidates = []
+for m in preferred_order:
+    if m not in seen:
+        seen.add(m)
+        candidates.append(m)
+
+models_to_run = [m for m in candidates if is_cached(m)]
+print(f"Models available locally: {models_to_run}")
+
+# Write the list so it's visible in the results
+with open("models_to_run.txt", "w") as f:
+    f.write("\n".join(models_to_run) + "\n")
+
 all_model_results = []
 ```
 
