@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -119,9 +120,111 @@ def get_answer_token_id(sample_prompt: str) -> int:
     return tokenizer.eos_token_id
 
 
+def _is_valid_labels_file(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        lines = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+        if not lines:
+            return False
+        labels = [r.get("label") for r in lines]
+        if not all("text" in r and r.get("label") in (0, 1) for r in lines):
+            return False
+        return len(set(labels)) >= 2
+    except Exception:
+        return False
+
+
+def generate_behavioral_labels(n_examples: int, output_path: str = "behavioral_labels.jsonl") -> str:
+    """
+    Generate two-turn sycophancy dataset from TruthfulQA using the loaded model.
+    Skips if output_path already exists with valid text+label records.
+    """
+    out = _OUTPUT_DIR / output_path
+    if _is_valid_labels_file(out):
+        n = sum(1 for l in out.read_text().splitlines() if l.strip())
+        return f"Skipping — {out} already exists with {n} valid examples"
+    if _session["model"] is None:
+        return "error: no model loaded — call load_model first"
+
+    import sycophancy_data
+    items = sycophancy_data.load_truthfulqa(n_examples)
+    all_examples = []
+    with open(out, "w") as f:
+        for idx, item in enumerate(items):
+            examples = sycophancy_data.build_examples(
+                _session["model"], _session["tokenizer"], item, idx
+            )
+            for ex in examples:
+                f.write(json.dumps(ex) + "\n")
+            all_examples.extend(examples)
+
+    rate = sycophancy_data.compute_sycophancy_rate(all_examples)
+    return (
+        f"Generated {len(all_examples)} examples to {out}. "
+        f"Sycophancy rate: {rate:.3f}. "
+        f"Label=1: {sum(e['label']==1 for e in all_examples)}, "
+        f"Label=0: {sum(e['label']==0 for e in all_examples)}"
+    )
+
+
+def extract_activations(labels_path: str, answer_token_id: int) -> str:
+    """
+    Extract and cache MHA, MLP, and residual activations. Call inspect_model first.
+    Writes activations/ with metadata.json, labels.npy, mha.npy, mlp.npy, residual.npy.
+    """
+    import numpy as np
+    import sycophancy_probes
+
+    if _session["model"] is None:
+        return "error: no model loaded — call load_model first"
+    if _session["model_config"] is None:
+        return "error: architecture unknown — call inspect_model first"
+
+    labels_file = _OUTPUT_DIR / labels_path
+    if not labels_file.exists():
+        return f"error: labels file not found at {labels_file}"
+
+    records = [json.loads(l) for l in labels_file.read_text().splitlines() if l.strip()]
+    texts = [r["text"] for r in records]
+    labels = [r["label"] for r in records]
+
+    config = {**_session["model_config"], "answer_token_id": answer_token_id}
+    activations = sycophancy_probes.collect_activations(
+        _session["model"], _session["tokenizer"], texts, config, batch_size=1
+    )
+
+    cache_dir = _OUTPUT_DIR / "activations"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    np.save(cache_dir / "labels.npy", np.array(labels, dtype=np.int64))
+    np.save(cache_dir / "mha.npy", activations["mha"].astype(np.float32))
+    np.save(cache_dir / "mlp.npy", activations["mlp"].astype(np.float32))
+    np.save(cache_dir / "residual.npy", activations["residual"].astype(np.float32))
+
+    mc = _session["model_config"]
+    metadata = {
+        "model_name": _session["model_path"],
+        "labels_path": labels_path,
+        "n_examples": len(texts),
+        "dtype": "float32",
+        "position_strategy": "answer_token_id",
+        "answer_token_id": answer_token_id,
+        "model_config": {k: mc[k] for k in ("n_layers", "n_heads", "hidden_dim", "head_dim", "mlp_dim", "mha_hook", "mlp_hook")},
+        "files": {"labels": "labels.npy", "mha": "mha.npy", "mlp": "mlp.npy", "residual": "residual.npy"},
+    }
+    (cache_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
+    _session["activations"] = str(cache_dir)
+    return (
+        f"Activations cached to {cache_dir} ({len(texts)} examples). "
+        f"Shapes: mha={activations['mha'].shape}, mlp={activations['mlp'].shape}"
+    )
+
+
 TOOLS = {
     "load_model": load_model,
     "cleanup_model": cleanup_model,
     "inspect_model": inspect_model,
     "get_answer_token_id": get_answer_token_id,
+    "generate_behavioral_labels": generate_behavioral_labels,
+    "extract_activations": extract_activations,
 }

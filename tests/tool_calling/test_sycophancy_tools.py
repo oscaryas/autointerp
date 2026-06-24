@@ -104,3 +104,67 @@ def test_get_answer_token_id_falls_back_to_eos():
     mock_tok.encode.return_value = [1, 2, 3]
     mod._session["tokenizer"] = mock_tok
     assert mod.get_answer_token_id("hello") == 2
+
+
+def test_generate_labels_skips_valid_existing(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    existing = tmp_path / "behavioral_labels.jsonl"
+    existing.write_text('{"text": "hi", "label": 1}\n{"text": "bye", "label": 0}\n')
+    result = mod.generate_behavioral_labels(200, "behavioral_labels.jsonl")
+    assert "skip" in result.lower() or "exist" in result.lower()
+    assert existing.read_text().startswith('{"text": "hi"')
+
+
+def test_generate_labels_regenerates_invalid_file(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    mod._session["model"] = MagicMock()
+    mod._session["tokenizer"] = MagicMock()
+    (tmp_path / "behavioral_labels.jsonl").write_text('{"text": "no label field"}\n')
+    with patch("sycophancy_data.load_truthfulqa", return_value=[]):
+        result = mod.generate_behavioral_labels(10, "behavioral_labels.jsonl")
+    assert "error" not in result.lower()
+
+
+def test_extract_activations_preconditions(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    # no model
+    assert "error" in mod.extract_activations("x.jsonl", 1).lower()
+    # model but no config
+    mod._session["model"] = MagicMock()
+    assert "inspect_model" in mod.extract_activations("x.jsonl", 1).lower()
+
+
+def test_extract_activations_writes_cache(tmp_path):
+    import numpy as np
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    (tmp_path / "labels.jsonl").write_text(
+        '{"text": "a", "label": 1}\n{"text": "b", "label": 0}\n'
+    )
+    mod._session["model"] = MagicMock()
+    mod._session["tokenizer"] = MagicMock()
+    mod._session["model_config"] = {
+        "n_layers": 2, "n_heads": 2, "hidden_dim": 8, "head_dim": 4,
+        "mlp_dim": 16, "mha_hook": "self_attn.o_proj", "mlp_hook": "mlp.down_proj",
+    }
+    fake = {
+        "mha": np.zeros((2, 2, 2, 4), dtype=np.float32),
+        "mlp": np.zeros((2, 2, 8), dtype=np.float32),
+        "residual": np.zeros((2, 2, 8), dtype=np.float32),
+    }
+    with patch("sycophancy_probes.collect_activations", return_value=fake):
+        result = mod.extract_activations("labels.jsonl", 105)
+    assert "error" not in result.lower(), result
+    cache = tmp_path / "activations"
+    assert (cache / "metadata.json").exists()
+    assert (cache / "mha.npy").exists()
+    meta = json.loads((cache / "metadata.json").read_text())
+    assert meta["n_examples"] == 2
+    assert meta["answer_token_id"] == 105
