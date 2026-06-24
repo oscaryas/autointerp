@@ -315,7 +315,7 @@ def collect_activations(
             mha_example = np.zeros((n_layers, n_heads, head_dim), dtype=np.float32)
             for layer_idx, act in activation_store["mha"].items():
                 # act shape: (1, seq_len, n_heads * head_dim)
-                vec = act[0, pos, :].numpy().astype(np.float32)
+                vec = act[0, pos, :].float().numpy().astype(np.float32)
                 mha_example[layer_idx] = vec.reshape(n_heads, head_dim)
             all_mha.append(mha_example)
 
@@ -323,14 +323,14 @@ def collect_activations(
             mlp_example = np.zeros((n_layers, hidden_dim), dtype=np.float32)
             for layer_idx, act in activation_store["mlp"].items():
                 # act shape: (1, seq_len, hidden_dim)
-                mlp_example[layer_idx] = act[0, pos, :].numpy().astype(np.float32)
+                mlp_example[layer_idx] = act[0, pos, :].float().numpy().astype(np.float32)
             all_mlp.append(mlp_example)
 
             # Residual: hidden_states is tuple of (1, seq_len, hidden_dim) per layer
             res_example = np.zeros((n_layers, hidden_dim), dtype=np.float32)
             hidden_states = outputs.hidden_states  # tuple length = n_layers + 1
             for layer_idx in range(n_layers):
-                hs = hidden_states[layer_idx + 1][0, pos, :].cpu().numpy().astype(np.float32)
+                hs = hidden_states[layer_idx + 1][0, pos, :].cpu().float().numpy().astype(np.float32)
                 res_example[layer_idx] = hs
             all_res.append(res_example)
 
