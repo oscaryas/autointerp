@@ -1,4 +1,3 @@
-import json
 import sys
 from pathlib import Path
 
@@ -39,7 +38,8 @@ def cleanup_model() -> str:
     import gpu_memory
     gpu_memory.safe_cleanup(model=_session["model"], tokenizer=_session["tokenizer"])
     _session.update({"model": None, "tokenizer": None, "dtype": None,
-                     "model_path": None, "model_config": None, "activations": None})
+                     "model_path": None, "model_config": None, "activations": None,
+                     "probe_results": {}})
     return "Model cleaned up, GPU memory released"
 
 
