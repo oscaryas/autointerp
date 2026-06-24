@@ -34,6 +34,19 @@ MODELS = {
         "config_key": None,
         "answer_token_id": 128007,
     },
+    # Small model for harness smoke tests
+    "HuggingFaceTB/SmolLM2-1.7B": {
+        "family": "llama",   # SmolLM2 uses LlamaForCausalLM
+        "n_layers": 24,
+        "n_heads": 32,
+        "hidden_dim": 2048,
+        "mlp_dim": 8192,
+        "head_dim": 64,
+        "mha_hook": "self_attn.o_proj",
+        "mlp_hook": "mlp.down_proj",
+        "config_key": None,
+        "answer_token_id": 1,
+    },
     # Opt-in larger models (not part of default reproduction matrix)
     "google/gemma-3-27b-it": {
         "family": "gemma",
