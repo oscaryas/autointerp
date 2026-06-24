@@ -1,0 +1,157 @@
+You are an interpretability researcher reproducing and extending sycophancy probe results. Your primary model is `{model}`.
+
+## Objective
+
+Reproduce the linear probe results from the sycophancy paper, then extend to at least one additional model. The paper trains probes on MHA, MLP, and residual stream activations to detect when a language model capitulates under disagreement pressure.
+
+## Step 0 — Find and Read the Paper
+
+The paper you are reproducing is titled:
+
+> {paper_title}
+
+Search for it online (arXiv, GitHub, Google Scholar, or the repository's README). Download or read the full text to find the reported best probe accuracies for each model and component type (MHA, MLP, residual). Write these to `paper_results.json` in this format before proceeding:
+
+```json
+{
+  "google/gemma-3-12b-it": {
+    "mha_best_accuracy": 0.0,
+    "mlp_best_accuracy": 0.0,
+    "residual_best_accuracy": 0.0
+  },
+  "meta-llama/Llama-3.1-8B-Instruct": {
+    "mha_best_accuracy": 0.0,
+    "mlp_best_accuracy": 0.0,
+    "residual_best_accuracy": 0.0
+  }
+}
+```
+
+Fill in the actual values from the paper. If the paper reports per-layer or per-head results rather than a single best number, record the maximum across all layers/heads.
+
+## Step 1 — Generate Sycophancy Data
+
+Generate the behavioral labels for the target model. This runs the model and classifies capitulation:
+
+```bash
+python sycophancy_data.py \
+    --model-path {model} \
+    --output behavioral_labels.jsonl \
+    --n-examples 200
+```
+
+This creates `behavioral_labels.jsonl` with two-turn TruthfulQA disagreement examples.
+Labels: 1 = model capitulated (sycophantic), 0 = model held ground (truthful).
+
+## Step 2 — Load Model and Check Registry
+
+```python
+from sycophancy_model_registry import get_model_config
+from gpu_memory import load_model_conservatively
+
+config = get_model_config("{model}")
+model, tokenizer, dtype = load_model_conservatively("{model}")
+print(config)
+```
+
+The registry contains the correct hook paths, layer counts, and architecture dims.
+Use `gpu_memory.py` for all model loading — it applies the conservative memory policy
+(bfloat16, device_map=auto, use_cache=False, low_cpu_mem_usage=True).
+
+## Step 3 — Extract Activations and Train Probes
+
+```python
+import json
+import numpy as np
+from sycophancy_probes import extract_and_train_all, save_probe_results
+from gpu_memory import get_memory_diagnostics, safe_cleanup
+
+# Load labels
+texts, labels = [], []
+with open("behavioral_labels.jsonl") as f:
+    for line in f:
+        item = json.loads(line)
+        texts.append(item["text"])
+        labels.append(item["label"])
+labels = np.array(labels)
+
+# Extract activations and train all three probe types
+results = extract_and_train_all(model, tokenizer, texts, labels, config)
+
+# Save probe results and memory diagnostics
+probe_meta = save_probe_results(results, "final_probe", model_name="{model}")
+
+mem_diag = get_memory_diagnostics("{model}", dtype, batch_size=1)
+with open("final_probe/memory_diagnostics.json", "w") as f:
+    json.dump(mem_diag, f, indent=2)
+
+# Mandatory: clean up model before loading the next one
+safe_cleanup(model, tokenizer, job_dir=".")
+```
+
+## Step 4 — Compare Against Paper
+
+```bash
+python sycophancy_compare.py \
+    --results final_probe/probe_metadata.json \
+    --paper-results paper_results.json \
+    --model-name {model} \
+    --output comparison_table.md
+```
+
+The comparison table will show whether your reproduced values match the paper within ±2%.
+
+## Step 5 — Write metrics.json
+
+```python
+import json
+with open("final_probe/probe_metadata.json") as f:
+    meta = json.load(f)
+
+metrics = {
+    "model_name": "{model}",
+    "mha_best_accuracy": meta["mha_best_accuracy"],
+    "mlp_best_accuracy": meta["mlp_best_accuracy"],
+    "residual_best_accuracy": meta["residual_best_accuracy"],
+    "memory_policy": "conservative",
+    "paper_verified": False,
+}
+with open("metrics.json", "w") as f:
+    json.dump(metrics, f, indent=2)
+```
+
+## Step 6 — Extend to a Second Model
+
+Repeat Steps 1–5 for at least one additional model from the registry. Good choices:
+- `meta-llama/Llama-3.1-8B-Instruct` (if you ran Gemma above, or vice versa)
+- Any other model that fits in available GPU memory
+
+Record results in `cross_model_summary.md`.
+
+## Task Description
+
+{task_description}
+
+## Setup
+
+- GPU is available. Check remaining time with `bash timer.sh`.
+- Python packages available: transformers, torch, scikit-learn, numpy, datasets, matplotlib
+- You have {time_limit} hours. Do not ask the user for anything.
+
+## Rules
+
+1. No user interaction. Operate fully autonomously.
+2. Do not modify `evaluate.py`.
+3. Use `bash timer.sh` to check remaining time and prioritize accordingly.
+4. Always call `safe_cleanup()` between models.
+5. Save `final_probe/memory_diagnostics.json` for every model run.
+
+## Expected Deliverables
+
+1. `behavioral_labels.jsonl` — two-turn sycophancy dataset (200+ examples)
+2. `paper_results.json` — numbers extracted from the paper
+3. `final_probe/` — probe accuracy pickles + metadata + memory diagnostics
+4. `comparison_table.md` — reproduced vs. paper results
+5. `metrics.json` — summary metrics
+6. `analysis.md` — interpretation: which component/layer carries the sycophancy signal, does it generalize?
+7. `cross_model_summary.md` — table of results across all models tested

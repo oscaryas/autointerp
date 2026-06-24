@@ -30,7 +30,7 @@ echo "Preparing job directory..."
 
 # Copy task files
 TASK_DIR="${AUTOINTERP_ROOT}/src/probing/tasks/${TASK}"
-cp "${TASK_DIR}/labeled_data.jsonl" "$JOB_DIR/"
+[ -f "${TASK_DIR}/labeled_data.jsonl" ] && cp "${TASK_DIR}/labeled_data.jsonl" "$JOB_DIR/"
 cp "${TASK_DIR}/evaluate.py" "$JOB_DIR/"
 [ -f "${TASK_DIR}/task_description.txt" ] && cp "${TASK_DIR}/task_description.txt" "$JOB_DIR/"
 [ -d "${TASK_DIR}/task_context" ] && cp -r "${TASK_DIR}/task_context" "$JOB_DIR/"

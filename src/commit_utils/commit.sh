@@ -16,6 +16,19 @@ tasks=(
     "truth_analysis"
 )
 
+# Sycophancy reproduction matrix — separate from the general tasks above
+sycophancy_models=(
+    "google/gemma-3-12b-it"
+    "meta-llama/Llama-3.1-8B-Instruct"
+)
+
+# Opt-in larger-model matrix (not submitted by default)
+# sycophancy_large_models=(
+#     "google/gemma-3-27b-it"
+#     "meta-llama/Llama-3.1-70B-Instruct"
+#     "Qwen/Qwen2.5-32B-Instruct"
+# )
+
 agents=(
     "claude:claude-opus-4-6"
     "codex:gpt-4"
@@ -42,6 +55,26 @@ for model in "${models[@]}"; do
 
             sleep 5
         done
+    done
+done
+
+echo ""
+echo "=== Submitting sycophancy reproduction jobs ==="
+echo "Models: ${sycophancy_models[*]}"
+
+for model in "${sycophancy_models[@]}"; do
+    for agent_spec in "${agents[@]}"; do
+        IFS=':' read -r agent agent_config <<< "$agent_spec"
+
+        echo "Submitting: $agent ($agent_config) | sycophancy | $model"
+
+        sbatch \
+            --account="${CSCS_ACCOUNT}" \
+            --time="$((AUTOINTERP_TIME_LIMIT + 1)):00:00" \
+            --export=ALL,task="sycophancy",model="${model}",agent="${agent}",agent_config="${agent_config}",num_hours="${AUTOINTERP_TIME_LIMIT}",num_gpus=1 \
+            src/commit_utils/single_task.slurm
+
+        sleep 5
     done
 done
 
