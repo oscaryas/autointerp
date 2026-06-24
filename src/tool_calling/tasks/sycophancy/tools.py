@@ -220,6 +220,130 @@ def extract_activations(labels_path: str, answer_token_id: int) -> str:
     )
 
 
+def train_probe_family(probe_type: str) -> str:
+    """
+    Train probes from cached activations. probe_type: mha, mlp, or residual.
+    Call extract_activations first. Call all three before write_metrics.
+    """
+    if _session["activations"] is None:
+        return "error: no activation cache — call extract_activations first"
+    if probe_type not in ("mha", "mlp", "residual"):
+        return f"error: probe_type must be mha, mlp, or residual — got '{probe_type}'"
+
+    import numpy as np
+    import sycophancy_probes
+
+    cache_dir = Path(_session["activations"])
+    meta = json.loads((cache_dir / "metadata.json").read_text())
+    mc = meta["model_config"]
+    n_layers = mc["n_layers"]
+    labels = np.load(cache_dir / "labels.npy").astype(np.float32)
+
+    if probe_type == "mha":
+        acts = np.load(cache_dir / "mha.npy")
+        acc, ci, states = sycophancy_probes.train_mha_probes(acts, labels, n_layers, mc["n_heads"])
+        _session["probe_results"]["mha"] = {"accuracy": acc, "ci": ci, "states": states}
+        best = max(acc.values()) if acc else 0.0
+        return f"MHA probes done. Best: {best:.3f} ({n_layers * mc['n_heads']} probes)"
+    elif probe_type == "mlp":
+        acts = np.load(cache_dir / "mlp.npy")
+        acc, ci = sycophancy_probes.train_mlp_probes(acts, labels, n_layers)
+        _session["probe_results"]["mlp"] = {"accuracy": acc, "ci": ci}
+        best = max(acc.values()) if acc else 0.0
+        return f"MLP probes done. Best: {best:.3f} ({n_layers} probes)"
+    else:
+        acts = np.load(cache_dir / "residual.npy")
+        acc, ci = sycophancy_probes.train_residual_probes(acts, labels, n_layers)
+        _session["probe_results"]["residual"] = {"accuracy": acc, "ci": ci}
+        best = max(acc.values()) if acc else 0.0
+        return f"Residual probes done. Best: {best:.3f} ({n_layers} probes)"
+
+
+def write_metrics() -> str:
+    """
+    Save probe results to final_probe/ and write job-local metrics.json.
+    Requires all three probe families. run_task.sh still runs evaluate.py after
+    agent exit and that evaluator output is the benchmark authority.
+    """
+    missing = [t for t in ("mha", "mlp", "residual") if t not in _session["probe_results"]]
+    if missing:
+        return f"error: missing probe families: {missing}. Call train_probe_family for each."
+
+    import sycophancy_probes
+
+    pr = _session["probe_results"]
+    results = {
+        "mha_accuracy": pr["mha"]["accuracy"],
+        "mha_ci": pr["mha"]["ci"],
+        "mha_states": pr["mha"].get("states", {}),
+        "mlp_accuracy": pr["mlp"]["accuracy"],
+        "mlp_ci": pr["mlp"]["ci"],
+        "residual_accuracy": pr["residual"]["accuracy"],
+        "residual_ci": pr["residual"]["ci"],
+    }
+    metadata = sycophancy_probes.save_probe_results(
+        results, str(_OUTPUT_DIR / "final_probe"), model_name=_session["model_path"] or ""
+    )
+    (_OUTPUT_DIR / "metrics.json").write_text(json.dumps(metadata, indent=2))
+    return (
+        f"metrics.json written. MHA best: {metadata['mha_best_accuracy']:.3f}, "
+        f"MLP best: {metadata['mlp_best_accuracy']:.3f}, "
+        f"Residual best: {metadata['residual_best_accuracy']:.3f}"
+    )
+
+
+def fetch_paper_results(paper_title: str) -> str:
+    """
+    Get paper-reported accuracies. Checks task_context/paper_results.json first
+    (preferred for reproducibility). Falls back to web search instructions.
+    Writes paper_results.json in the flat format expected by sycophancy_compare:
+    {model_name: {mha_best_accuracy, mlp_best_accuracy, residual_best_accuracy}}.
+    """
+    cached = _OUTPUT_DIR / "task_context" / "paper_results.json"
+    if cached.exists():
+        try:
+            data = json.loads(cached.read_text())
+            (_OUTPUT_DIR / "paper_results.json").write_text(json.dumps(data, indent=2))
+            return f"Loaded from task_context/paper_results.json. Models: {list(data.keys())}"
+        except Exception as e:
+            return f"error parsing task_context/paper_results.json: {e}"
+
+    return (
+        f"No task_context/paper_results.json found. Search for '{paper_title}' on arXiv. "
+        "Find the table with best MHA, MLP, residual accuracies for Gemma-3-12B and Llama-3.1-8B. "
+        'Write paper_results.json as: {"<model_name>": {"mha_best_accuracy": 0.0, '
+        '"mlp_best_accuracy": 0.0, "residual_best_accuracy": 0.0}}. '
+        "Include source URL. Call fetch_paper_results again after writing to validate."
+    )
+
+
+def compare_with_paper(results_path: str, paper_results_path: str) -> str:
+    """Compare reproduced metrics against paper. Writes comparison_table.md."""
+    import sycophancy_compare
+
+    results_file = _OUTPUT_DIR / results_path
+    paper_file = _OUTPUT_DIR / paper_results_path
+    if not results_file.exists():
+        return f"error: {results_file} not found — call write_metrics first"
+    if not paper_file.exists():
+        return f"error: {paper_file} not found — call fetch_paper_results first"
+
+    results = json.loads(results_file.read_text())
+    paper = json.loads(paper_file.read_text())
+    model_name = results.get("model_name", _session.get("model_path") or "")
+    rows = sycophancy_compare.compare(results, paper, model_name)
+    table = sycophancy_compare.render_table(rows)
+
+    (_OUTPUT_DIR / "comparison_table.md").write_text(table + "\n")
+    return f"comparison_table.md written ({len(rows)} rows)"
+
+
+def write_analysis(text: str) -> str:
+    """Write analysis.md with findings summary."""
+    (_OUTPUT_DIR / "analysis.md").write_text(text)
+    return f"analysis.md written ({len(text)} chars)"
+
+
 TOOLS = {
     "load_model": load_model,
     "cleanup_model": cleanup_model,
@@ -227,4 +351,9 @@ TOOLS = {
     "get_answer_token_id": get_answer_token_id,
     "generate_behavioral_labels": generate_behavioral_labels,
     "extract_activations": extract_activations,
+    "train_probe_family": train_probe_family,
+    "write_metrics": write_metrics,
+    "fetch_paper_results": fetch_paper_results,
+    "compare_with_paper": compare_with_paper,
+    "write_analysis": write_analysis,
 }

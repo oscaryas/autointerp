@@ -168,3 +168,70 @@ def test_extract_activations_writes_cache(tmp_path):
     meta = json.loads((cache / "metadata.json").read_text())
     assert meta["n_examples"] == 2
     assert meta["answer_token_id"] == 105
+
+
+def test_train_probe_no_activations_error():
+    mod = _get_tools()
+    _reset(mod)
+    result = mod.train_probe_family("mha")
+    assert "error" in result.lower() and "extract_activations" in result.lower()
+
+
+def test_train_probe_invalid_type_error():
+    mod = _get_tools()
+    _reset(mod)
+    mod._session["activations"] = "/some/path"
+    assert "error" in mod.train_probe_family("bad_type").lower()
+
+
+def test_train_probe_mha_from_cache(tmp_path):
+    import numpy as np
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    cache = tmp_path / "activations"
+    cache.mkdir()
+    n, n_layers, n_heads, head_dim = 20, 2, 2, 4
+    np.save(cache / "mha.npy", np.random.rand(n_layers, n_heads, n, head_dim).astype(np.float32))
+    np.save(cache / "mlp.npy", np.random.rand(n_layers, n, 8).astype(np.float32))
+    np.save(cache / "residual.npy", np.random.rand(n_layers, n, 8).astype(np.float32))
+    np.save(cache / "labels.npy", [i % 2 for i in range(n)])
+    (cache / "metadata.json").write_text(json.dumps({
+        "model_name": "test", "n_examples": n,
+        "model_config": {"n_layers": n_layers, "n_heads": n_heads, "hidden_dim": 8, "head_dim": head_dim},
+    }))
+    mod._session["activations"] = str(cache)
+    result = mod.train_probe_family("mha")
+    assert "error" not in result.lower(), result
+    assert "mha" in mod._session["probe_results"]
+
+
+def test_write_metrics_requires_all_families(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    mod._session["probe_results"] = {"mha": {}, "mlp": {}}
+    result = mod.write_metrics()
+    assert "error" in result.lower() and "residual" in result.lower()
+
+
+def test_write_analysis(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    result = mod.write_analysis("## Findings\n\nTest.")
+    assert "error" not in result.lower()
+    assert (tmp_path / "analysis.md").read_text() == "## Findings\n\nTest."
+
+
+def test_fetch_paper_results_uses_task_context(tmp_path):
+    mod = _get_tools()
+    _reset(mod)
+    mod.set_output_dir(tmp_path)
+    ctx = tmp_path / "task_context"
+    ctx.mkdir()
+    data = {"google/gemma-3-12b-it": {"mha_best_accuracy": 0.87}}
+    (ctx / "paper_results.json").write_text(json.dumps(data))
+    result = mod.fetch_paper_results("Some Paper")
+    assert "error" not in result.lower()
+    assert (tmp_path / "paper_results.json").exists()
