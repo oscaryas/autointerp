@@ -85,10 +85,13 @@ def _run_anthropic_loop(system_prompt, user_prompt, schemas, registry, model, ma
     messages = [{"role": "user", "content": user_prompt}]
 
     for _ in range(max_iterations):
-        response = client.messages.create(
-            model=model, max_tokens=4096,
-            system=system_prompt, tools=schemas, messages=messages,
-        )
+        try:
+            response = client.messages.create(
+                model=model, max_tokens=4096,
+                system=system_prompt, tools=schemas, messages=messages,
+            )
+        except Exception as e:
+            return f"error: API call failed: {type(e).__name__}: {e}"
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
@@ -135,10 +138,13 @@ def _run_openai_loop(system_prompt, user_prompt, schemas, registry, model, max_i
     ]
 
     for _ in range(max_iterations):
-        response = client.chat.completions.create(
-            model=model, messages=messages,
-            tools=openai_schemas if openai_schemas else None,
-        )
+        try:
+            response = client.chat.completions.create(
+                model=model, messages=messages,
+                tools=openai_schemas if openai_schemas else None,
+            )
+        except Exception as e:
+            return f"error: API call failed: {type(e).__name__}: {e}"
         choice = response.choices[0]
         msg = choice.message
 

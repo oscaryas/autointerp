@@ -102,7 +102,7 @@ def inspect_model() -> dict:
     return config
 
 
-def get_answer_token_id(sample_prompt: str) -> int:
+def get_answer_token_id(sample_prompt: str) -> int | str:
     """
     Return the delimiter token ID used by the existing activation extractor to
     choose an answer position. Despite the name, this is not always the first
@@ -295,7 +295,7 @@ def write_metrics() -> str:
 def fetch_paper_results(paper_title: str) -> str:
     """
     Get paper-reported accuracies. Checks task_context/paper_results.json first
-    (preferred for reproducibility). Falls back to web search instructions.
+    (preferred for reproducibility). Falls back to checking _OUTPUT_DIR, then web search instructions.
     Writes paper_results.json in the flat format expected by sycophancy_compare:
     {model_name: {mha_best_accuracy, mlp_best_accuracy, residual_best_accuracy}}.
     """
@@ -308,12 +308,21 @@ def fetch_paper_results(paper_title: str) -> str:
         except Exception as e:
             return f"error parsing task_context/paper_results.json: {e}"
 
+    # Check if already written to output dir
+    output_cached = _OUTPUT_DIR / "paper_results.json"
+    if output_cached.exists():
+        try:
+            data = json.loads(output_cached.read_text())
+            return f"Found paper_results.json already in output dir. Models: {list(data.keys())}"
+        except Exception as e:
+            return f"error parsing paper_results.json: {e}"
+
     return (
-        f"No task_context/paper_results.json found. Search for '{paper_title}' on arXiv. "
-        "Find the table with best MHA, MLP, residual accuracies for Gemma-3-12B and Llama-3.1-8B. "
-        'Write paper_results.json as: {"<model_name>": {"mha_best_accuracy": 0.0, '
-        '"mlp_best_accuracy": 0.0, "residual_best_accuracy": 0.0}}. '
-        "Include source URL. Call fetch_paper_results again after writing to validate."
+        f"No paper_results.json found. Search for '{paper_title}' on arXiv. "
+        "Find best MHA, MLP, residual accuracies for the models you tested. "
+        "Write paper_results.json using write_analysis() with JSON: "
+        '{"<model_name>": {"mha_best_accuracy": 0.X, "mlp_best_accuracy": 0.X, "residual_best_accuracy": 0.X}, ...}. '
+        "Call: write_analysis(json_text, 'paper_results.json')"
     )
 
 
@@ -338,10 +347,11 @@ def compare_with_paper(results_path: str, paper_results_path: str) -> str:
     return f"comparison_table.md written ({len(rows)} rows)"
 
 
-def write_analysis(text: str) -> str:
-    """Write analysis.md with findings summary."""
-    (_OUTPUT_DIR / "analysis.md").write_text(text)
-    return f"analysis.md written ({len(text)} chars)"
+def write_analysis(text: str, filename: str = "analysis.md") -> str:
+    """Write text to filename in the output directory. Default filename is analysis.md."""
+    out = _OUTPUT_DIR / filename
+    out.write_text(text)
+    return f"{filename} written ({len(text)} chars)"
 
 
 TOOLS = {
